@@ -1,7 +1,6 @@
 rm(list=ls())
 
-
- setwd("C://")
+setwd("./ch1andch2 dataset")
 
 lightbeer = read.csv("light_beer_preference_survey.csv")
 head( lightbeer )  
