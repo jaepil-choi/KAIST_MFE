@@ -1,6 +1,6 @@
 rm(list=ls())
 
-setwd("C:/Users/Administrator/Dropbox/KAIST Course/2023 Spring/BIZ500/DataExamples")
+setwd("./ch3_dataset")
 
 longdist <- read.csv('long_distance_telephone_bills.csv')
 head( longdist )
