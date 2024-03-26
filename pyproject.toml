@@ -27,6 +27,7 @@ opstrat = "^0.1.7"
 option-price = "^0.2.0"
 factor-analyzer = "^0.5.1"
 arch = "^6.3.0"
+numpy-financial = "^1.0.0"
 
 
 [build-system]
