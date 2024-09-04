@@ -1,0 +1,504 @@
+141
+142  *SAS 3: Construct BE data ***************************************;
+143
+144  data compustat (drop = at indfmt datafmt popsrc consol);
+145      set compa.funda (keep = gvkey datadate at pstkl txdb
+146              itcb pstkrv seq pstk indfmt datafmt popsrc consol);
+147      where indfmt='INDL' and datafmt='STD' and popsrc='D' and consol='C'
+148          and datadate >="&comp_start_date"d and datadate <="&end_date"d;
+149  run;
+
+NOTE: There were 432180 observations read from the data set COMPA.FUNDA.
+      WHERE (indfmt='INDL') and (datafmt='STD') and (popsrc='D') and
+      (consol='C') and (datadate>='01JAN1961'D and datadate<='31DEC2012'D);
+NOTE: The data set WORK.COMPUSTAT has 432180 observations and 8 variables.
+NOTE: DATA statement used (Total process time):
+      real time           14.27 seconds
+      cpu time            2.36 seconds
+
+
+150
+151  * Add permno and permco to BE data using the link-used table;
+152  * The nobs might increase because a firm can be matched to multiple
+152! permno's;
+153  proc sql;
+154      create table compustat_permno
+155      as select distinct a.*, b.upermno as permno, b.upermco as permco
+156      from compustat as a
+157      left join my_lib.ccmxpf_lnkused
+158          ( keep = ugvkey upermno upermco ulinkdt ulinkenddt usedflag
+158! ulinktype
+159          where = (usedflag = 1 and ulinktype in ("LU","LC")) ) as b
+160      on a.gvkey = b.ugvkey
+161      and (b.ulinkdt <= a.datadate or missing(b.ulinkdt) = 1)
+162      and (a.datadate <= b.ulinkenddt or missing(b.ulinkenddt) = 1)
+163      order by a.datadate, a.gvkey;
+ERROR: File MY_LIB.CCMXPF_LNKUSED.INDEX does not exist.
+NOTE: Table WORK.COMPUSTAT_PERMNO created, with 434269 rows and 10 columns.
+
+164  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           20.81 seconds
+      cpu time            0.76 seconds
+
+
+165  proc sort data = compustat_permno; by gvkey datadate; run;
+
+NOTE: There were 434269 observations read from the data set
+      WORK.COMPUSTAT_PERMNO.
+NOTE: The data set WORK.COMPUSTAT_PERMNO has 434269 observations and 10
+      variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.08 seconds
+      cpu time            0.23 seconds
+
+
+166
+167  * Calculate BE;
+168  data BE;
+169      set compustat_permno (where = (missing(permno) = 0));
+170
+171      year = year(datadate);
+172
+173      if missing(ITCB) then ITCB = 0; * investment tax credit;
+174
+175      BVPS = PSTKRV; * preferred stock - redemption value;
+176      if missing(BVPS) then BVPS = PSTKL; * preferred stock - liquidating
+176! value;
+177      if missing(BVPS) then BVPS = PSTK; * preferred stock- par value;
+178      if missing(BVPS) then BVPS = 0;
+179
+180      BE = SEQ + TXDB + ITCB - BVPS; * If SEQ or TXDB is missing, BE, too,
+180! will be missing;
+181      if BE<=0 then BE = .; * If BE<0, the value of BE is taken to be missing
+181! ;
+182
+183      label datadate = "Fiscal Year End Date";
+184      keep gvkey datadate year BE permno permco;
+185  run;
+
+NOTE: Missing values were generated as a result of performing an operation on
+      missing values.
+      Each place is given by: (Number of times) at (Line):(Column).
+      42366 at 180:14
+NOTE: There were 264450 observations read from the data set
+      WORK.COMPUSTAT_PERMNO.
+      WHERE MISSING(permno)=0;
+NOTE: The data set WORK.BE has 264450 observations and 6 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.11 seconds
+
+
+186
+187  * In some cases, firms change the month in which their fiscal year ends,
+188  * resulting in two entries in the Compustat database for the same calendar
+188! year y.
+189  * In such cases, data from the latest in the given calendar year y are
+189! used.;
+190  proc sort data = BE; by gvkey permno year datadate; run;
+
+NOTE: There were 264450 observations read from the data set WORK.BE.
+NOTE: The data set WORK.BE has 264450 observations and 6 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.11 seconds
+
+
+191  data BE;
+192      set BE;
+193      by gvkey permno year datadate;
+194      if last.year;
+195  run;
+
+NOTE: There were 264450 observations read from the data set WORK.BE.
+NOTE: The data set WORK.BE has 263854 observations and 6 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.05 seconds
+
+
+196  proc sort data = BE nodupkey; by gvkey permno year datadate; run;
+
+NOTE: There were 263854 observations read from the data set WORK.BE.
+NOTE: 0 observations with duplicate key values were deleted.
+NOTE: The data set WORK.BE has 263854 observations and 6 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.11 seconds
+
+
+197
+198
+199
+200
+201  * SAS 4: Merge CRSP stock and event file and add risk-free rate
+201! *******************;
+202
+203  %let filter=%str(shrcd in (10,11) and exchcd in (1,31,2,32,3,33));
+204
+205  %crspmerge(s = m, outset = CRSP,
+206  start = &start_date, end = &end_date,
+207  sfvars = permco ret vol shrout prc altprc,
+208  sevars = siccd shrcd exchcd dlstcd dlret,
+209  filters=&filter);
+#### START. Merging CRSP Stock File (msf) and Event File (mse)
+NOTE: Table WORK.__SFDATA created, with 3627162 rows and 8 columns.
+
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           1.87 seconds
+      cpu time            2.68 seconds
+
+
+NOTE: Table WORK.__SEDATA created, with 2532196 rows and 7 columns.
+
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           2.00 seconds
+      cpu time            2.09 seconds
+
+
+
+NOTE: Variable lag_dlstcd is uninitialized.
+NOTE: Variable lag_dlret is uninitialized.
+WARNING: The variable lag_dlstcd in the DROP, KEEP, or RENAME list has never
+         been referenced.
+WARNING: The variable lag_dlret in the DROP, KEEP, or RENAME list has never
+         been referenced.
+NOTE: There were 2532196 observations read from the data set WORK.__SEDATA.
+NOTE: There were 3627162 observations read from the data set WORK.__SFDATA.
+NOTE: The data set WORK.CRSP has 3665078 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.96 seconds
+      cpu time            0.97 seconds
+
+
+
+NOTE: There were 2939586 observations read from the data set WORK.CRSP.
+      WHERE shrcd in (10, 11) and exchcd in (1, 2, 3, 31, 32, 33);
+NOTE: 18393 duplicate observations were deleted.
+NOTE: The data set WORK.CRSP has 2921193 observations and 13 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.87 seconds
+      cpu time            1.50 seconds
+
+
+NOTE: Table WORK.__SEDATA has been dropped.
+NOTE: Table WORK.__SFDATA has been dropped.
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.06 seconds
+
+
+#### DONE . Dataset CRSP Created!
+210
+211  proc sql;
+212      create table CRSP_M
+213      as select distinct a.*, b.rf
+214      from CRSP as a
+215      left join ff.factors_monthly as b
+216      on year(a.date) = year(b.date) and month(a.date) = month(b.date);
+NOTE: Table WORK.CRSP_M created, with 2921193 rows and 14 columns.
+
+217  quit;
+NOTE: PROCEDURE SQL used (Total process time):
+      real time           2.77 seconds
+      cpu time            5.17 seconds
+
+
+218
+219
+220  * SAS 5: Construct ME and return data *************************************
+220! ;
+221
+222  * Calculate excess return adjusted for delising;
+223  data CRSP_M2;
+224      set CRSP_M;
+225
+226      year = year(date);
+227
+228      * calculate market capitalization;
+229      if abs(altprc)>0 and shrout>0 then Meq = abs(altprc)*shrout/1000;
+230
+231      * if dlret is missing, follow Shumway (1997) to determine dlret;
+232      if missing(dlstcd) = 0 and missing(dlret) =1 then do;
+233          if dlstcd in (500, 520, 574, 580, 584) or (dlstcd>=551 and
+233! dlstcd<=573)
+234              then dlret = -0.3;
+235          else dlret = -1;
+236      end;
+237
+238      * calculate return adjusted for delisting;
+239      if missing(dlstcd) = 0 then do;
+240          if missing(ret) = 0 then retadj = (1+ret)*(1+dlret)-1;
+241          else retadj = dlret;
+242      end;
+243      else retadj = ret;
+244
+245      eretadj = retadj - rf;
+246  run;
+
+NOTE: Missing values were generated as a result of performing an operation on
+      missing values.
+      Each place is given by: (Number of times) at (Line):(Column).
+      13449 at 229:8    39656 at 245:22
+NOTE: There were 2921193 observations read from the data set WORK.CRSP_M.
+NOTE: The data set WORK.CRSP_M2 has 2921193 observations and 18 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.60 seconds
+      cpu time            0.60 seconds
+
+
+247  proc sort data = CRSP_M2; by date permco Meq; run;
+
+NOTE: There were 2921193 observations read from the data set WORK.CRSP_M2.
+NOTE: The data set WORK.CRSP_M2 has 2921193 observations and 18 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.98 seconds
+      cpu time            1.70 seconds
+
+
+248
+249  * There are cases when the same firm (permco) has two or more securities
+249! (permno)
+250  at the same date.
+251  * We aggregate all ME for a given permco and date,
+252  * and assign this aggregated ME to the permno with the largest ME;
+253  data CRSP_M3;
+254      set CRSP_M2;
+255      by date permco Meq;
+256      retain ME;
+257
+258      if first.permco and last.permco then do;
+259          ME = Meq;
+260          output;
+261      end;
+262      else do;
+263          if first.permco then ME = Meq;
+264          else ME = sum(Meq, ME);
+265          If last.permco then output;
+266      end;
+267  run;
+
+NOTE: There were 2921193 observations read from the data set WORK.CRSP_M2.
+NOTE: The data set WORK.CRSP_M3 has 2892465 observations and 19 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.64 seconds
+      cpu time            0.65 seconds
+
+
+268
+269  proc sort data = crsp_m3 nodupkey; by permno date; run;
+
+NOTE: There were 2892465 observations read from the data set WORK.CRSP_M3.
+NOTE: 0 observations with duplicate key values were deleted.
+NOTE: The data set WORK.CRSP_M3 has 2892465 observations and 19 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           1.22 seconds
+      cpu time            1.94 seconds
+
+
+270
+271
+272
+273
+274  * SAS 6: Merge BE and ME with Return Data
+274! *************************************;
+275
+276  * Calculate BM from the previous year and June ME from this year for each
+276! permno;
+277  data ME_Jun;
+278      set CRSP_M3 (where = (month(date) = 6 & missing(ME) = 0));
+279      t = year(date);
+280      ME_Jun = ME;
+281      keep permno t ME_Jun;
+282  run;
+
+NOTE: There were 239521 observations read from the data set WORK.CRSP_M3.
+      WHERE (MONTH(date)=6) and (MISSING(ME)=0);
+NOTE: The data set WORK.ME_JUN has 239521 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.58 seconds
+      cpu time            0.58 seconds
+
+
+283  proc sort data = ME_Jun; by permno t; run;
+
+NOTE: There were 239521 observations read from the data set WORK.ME_JUN.
+NOTE: The data set WORK.ME_JUN has 239521 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+
+
+284  data ME_last_Dec;
+285      set CRSP_M3 (where = (month(date) = 12 & missing(ME) = 0));
+286      t = year(date)+1;
+287      ME_last_Dec = ME;
+288      keep permno t ME_last_Dec;
+289  run;
+
+NOTE: There were 242805 observations read from the data set WORK.CRSP_M3.
+      WHERE (MONTH(date)=12) and (MISSING(ME)=0);
+NOTE: The data set WORK.ME_LAST_DEC has 242805 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.56 seconds
+      cpu time            0.57 seconds
+
+
+290  proc sort data = ME_last_Dec; by permno t; run;
+
+NOTE: There were 242805 observations read from the data set WORK.ME_LAST_DEC.
+NOTE: The data set WORK.ME_LAST_DEC has 242805 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+
+
+291  data BE_last_year;
+292      set BE (where = (missing(BE) = 0));
+293      t = year+1;
+294      BE_last_year = BE;
+295      keep permno t BE_last_year;
+296  run;
+
+NOTE: There were 213229 observations read from the data set WORK.BE.
+      WHERE MISSING(BE)=0;
+NOTE: The data set WORK.BE_LAST_YEAR has 213229 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.06 seconds
+
+
+297  proc sort data = BE_last_year; by permno t; run;
+
+NOTE: There were 213229 observations read from the data set WORK.BE_LAST_YEAR.
+NOTE: The data set WORK.BE_LAST_YEAR has 213229 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.04 seconds
+
+
+298
+299  data ME_BM;
+300      merge ME_Jun (in = a) BE_last_year (in = b) ME_last_Dec (in = c);
+301      by permno t;
+302      if a & b & c;
+303
+304      BM = BE_last_year/ME_last_Dec;
+305      keep permno t ME_Jun BM;
+306  run;
+
+NOTE: There were 239521 observations read from the data set WORK.ME_JUN.
+NOTE: There were 213229 observations read from the data set WORK.BE_LAST_YEAR.
+NOTE: There were 242805 observations read from the data set WORK.ME_LAST_DEC.
+NOTE: The data set WORK.ME_BM has 174169 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.06 seconds
+      cpu time            0.07 seconds
+
+
+307
+308  * Match each permno's monthly return to the corresponding BM and ME;
+309  data ret;
+310      set CRSP_M3;
+311      if month(date)>6 then t = year(date);
+312      else t = year(date)-1;
+313  run;
+
+NOTE: There were 2892465 observations read from the data set WORK.CRSP_M3.
+NOTE: The data set WORK.RET has 2892465 observations and 20 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.70 seconds
+      cpu time            0.70 seconds
+
+
+314  proc sort data = ret; by permno t date; run;
+
+NOTE: There were 2892465 observations read from the data set WORK.RET.
+NOTE: The data set WORK.RET has 2892465 observations and 20 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           1.26 seconds
+      cpu time            1.59 seconds
+
+
+315  data ret_ME_BM;
+316      merge ret (in = a) ME_BM (in = b);
+317      by permno t;
+318      if a;
+319  run;
+
+NOTE: MERGE statement has more than one data set with repeats of BY values.
+NOTE: There were 2892465 observations read from the data set WORK.RET.
+NOTE: There were 174169 observations read from the data set WORK.ME_BM.
+NOTE: The data set WORK.RET_ME_BM has 2892465 observations and 22 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.75 seconds
+      cpu time            0.76 seconds
+
+
+320
+321  * Also add the mktcap and stock price from the previous month;
+322  proc sort data = ret_ME_BM; by permno date; run;
+
+NOTE: There were 2892465 observations read from the data set WORK.RET_ME_BM.
+NOTE: The data set WORK.RET_ME_BM has 2892465 observations and 22 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           1.44 seconds
+      cpu time            1.64 seconds
+
+
+323  data ret_ME_BM;
+324      set ret_ME_BM;
+325
+326      altprc_lag1 = lag1(altprc);
+327      ME_lag1 = lag1(ME);
+328
+329      permno_lag1 = lag1(permno);
+330      date_lag1 = lag1(date);
+331
+332      if (permno NE permno_lag1) or (intck('month',date_lag1,date) > 1) then
+332! do;
+333          altprc_lag1 = .;
+334          ME_lag1 = .;
+335          end;
+336  run;
+
+NOTE: There were 2892465 observations read from the data set WORK.RET_ME_BM.
+NOTE: The data set WORK.RET_ME_BM has 2892465 observations and 26 variables.
+NOTE: DATA statement used (Total process time):
+      real time           1.84 seconds
+      cpu time            1.24 seconds
+
+
+337
+338  data tt;
+339      set ret_ME_BM;
+340      if altprc_lag1 = .;
+341  run;
+
+NOTE: There were 2892465 observations read from the data set WORK.RET_ME_BM.
+NOTE: The data set WORK.TT has 38518 observations and 26 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.18 seconds
+      cpu time            0.18 seconds
+
+
+342
+343
+344  * Exclude observations with missing values;
+345  data assignment1_data;
+346      retain permno date year exchcd siccd retadj eretadj altprc_lag1 ME_lag1
+346!  ME_Jun BM;
+347      set ret_ME_BM;
+348      if nmiss(retadj, ME_lag1, ME_Jun, BM) = 0;
+349      keep permno date year exchcd siccd retadj eretadj altprc_lag1 ME_lag1
+349! ME_Jun BM;
+350  run;
+
+NOTE: There were 2892465 observations read from the data set WORK.RET_ME_BM.
+NOTE: The data set WORK.ASSIGNMENT1_DATA has 1983365 observations and 11
+      variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.34 seconds
+      cpu time            0.35 seconds
+

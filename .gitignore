@@ -188,3 +188,6 @@ cython_debug/
 ## sandbox
 sandbox.ipynb
 sandbox.py
+
+## large data
+CRSP_M.csv  
