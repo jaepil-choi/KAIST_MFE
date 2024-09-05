@@ -219,14 +219,14 @@ quit;
 * Calculate excess return adjusted for delising; 
 data CRSP_M2; 
  set CRSP_M; 
- year = year(date); 
+ year = year(date); *** date, 매달 마지막 거래일 값이 들어가있다. 거기서 연도를 뽑아냄. ;
  * calculate market capitalization; 
- if abs(altprc)>0 and shrout>0 then Meq = abs(altprc)*shrout/1000;  
+ if abs(altprc)>0 and shrout>0 then Meq = abs(altprc)*shrout/1000;  *** 절대값이 0보다 크면, market equity 값을 계산을 해라. (Meq) 만족 안하면 missing으로 처리.;
  * if dlret is missing, follow Shumway (1997) to determine dlret; 
- if missing(dlstcd) = 0 and missing(dlret) =1 then do; 
+ if missing(dlstcd) = 0 and missing(dlret) =1 then do; *** 있긴한데 delisting return이 missing이면, 아래와 같이 처리.;
   if dlstcd in (500, 520, 574, 580, 584) or (dlstcd>=551 and dlstcd<=573)  
-   then dlret = -0.3; 
-  else dlret = -1;  
+   then dlret = -0.3; *** 위 사유들에 대해선 적당히 -0.3으로 처리;
+  else dlret = -1; *** 그 외에는 -1 (-100%)로 처리;
  end; 
  * calculate return adjusted for delisting; 
  if missing(dlstcd) = 0 then do; 
@@ -234,7 +234,7 @@ data CRSP_M2;
   else retadj = dlret; 
  end; 
  else retadj = ret; 
- eretadj = retadj - rf; 
+ eretadj = retadj - rf; *** 이게 최종적으로 사용하는 return. risk-free rate를 빼준 것. ;
 run;
 proc sort data = CRSP_M2; by date permco Meq; run; 
 
@@ -247,17 +247,19 @@ data CRSP_M3;
  by date permco Meq; 
  retain ME;  
  if first.permco and last.permco then do; 
-  ME = Meq; 
+  ME = Meq; *** Meq는 각 share class의 Market equity, ME는 각 회사(permco)의 Market equity의 합. 
   output; 
  end; 
  else do; 
-  if first.permco then ME = Meq; 
-  else ME = sum(Meq, ME); 
+  if first.permco then ME = Meq; *** ME는 Meq의 누적합. ;
+  else ME = sum(Meq, ME); *** 누적합하는 컬럼 ME를 만들었으니, 누적합하는데 사용한 그 이전의 row들은 다 날림. ;
   If last.permco then output; 
  end; 
 run;
 
-proc sort data = crsp_m3 nodupkey; by permno date; run; 
+*** CRSP M3가 M2보단 작아야 한다. 아니라면 뭔가 잘못한 것임. ;
+
+proc sort data = crsp_m3 nodupkey; by permno date; run; *** duplicates 있는지 확인하려고 매번 체크하는 부분; 
 
 * SAS 6: Merge BE and ME with Return Data *************************************; 
 
