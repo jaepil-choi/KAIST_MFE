@@ -141,7 +141,7 @@ quit;
 
 * sample period; 
 %let comp_start_date = 01JAN1961; * we get the two years of accounting data before 1963; 
-%let start_date = 01JAN1961; 
+%let start_date = 01JAN1961; * 쓰는 것은 1963년부터 2012년 쓸 껀데, 2년의 accounting data 확보를 위해 1961부터 불러옴 ;
 %let end_date = 31DEC2012;
 
 *SAS 3: Construct BE data ***************************************; 
@@ -151,6 +151,12 @@ data compustat (drop = at indfmt datafmt popsrc consol);
    itcb pstkrv seq pstk indfmt datafmt popsrc consol); 
  where indfmt='INDL' and datafmt='STD' and popsrc='D' and consol='C'  
   and datadate >="&comp_start_date"d and datadate <="&end_date"d; 
+** Compustat에 적용하는 필터들:
+* indfmt='INDL' --> industry format: non-financial firm만 쓰는 것.
+* datafmt='STD' --> data format: standardized report만 쓸 것. 
+* popsrc='D' --> population source: domestic report만 쓸 것. 
+* consol='C' --> consolidation level: consolidated report (연결 재무제표)만 쓸 것. ;
+* ;
 run;
 
 * Add permno and permco to BE data using the link-used table;
@@ -174,10 +180,12 @@ data BE;
  set compustat_permno (where = (missing(permno) = 0)); 
  year = year(datadate); 
  if missing(ITCB) then ITCB = 0; * investment tax credit; 
- BVPS = PSTKRV; * preferred stock - redemption value; 
- if missing(BVPS) then BVPS = PSTKL; * preferred stock - liquidating value; 
- if missing(BVPS) then BVPS = PSTK; * preferred stock- par value; 
- if missing(BVPS) then BVPS = 0; 
+
+ BVPS = PSTKRV; * bool value of preferred stock (BVPS) = preferred stock 의 redemption value로 일단 놓고; 
+ if missing(BVPS) then BVPS = PSTKL; * 없으면 preferred stock 의 liquidating value; 
+ if missing(BVPS) then BVPS = PSTK; * 또 없으면 preferred stock의 par value; 
+ if missing(BVPS) then BVPS = 0; * 다 없으면 0;
+ 
  BE = SEQ + TXDB + ITCB - BVPS; * If SEQ or TXDB is missing, BE, too, will be missing; 
  if BE<=0 then BE = .; * If BE<0, the value of BE is taken to be missing;  
 
