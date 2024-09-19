@@ -230,8 +230,12 @@ data CRSP_M2;
  year = year(date); *** date, 매달 마지막 거래일 값이 들어가있다. 거기서 연도를 뽑아냄. ;
  * calculate market capitalization; 
  if abs(altprc)>0 and shrout>0 then Meq = abs(altprc)*shrout/1000;  *** 절대값이 0보다 크면, market equity 값을 계산을 해라. (Meq) 만족 안하면 missing으로 처리.;
+ ** ALTPRC: last non-missing price over all days in the month인데,  ;
+ ** CRSP는 거래가 없을 경우 last bid와 last ask의 평균을 - 로 report함. ;
+ ** 즉, 가격이 -인 것이 오류가 아니라는 소리임. 날려버리면 안됨. ; 
+ ** 진짜 데이터가 available하지 않은 경우는 0이나 missing으로 표시해줌. ;
  * if dlret is missing, follow Shumway (1997) to determine dlret; 
- if missing(dlstcd) = 0 and missing(dlret) =1 then do; *** 있긴한데 delisting return이 missing이면, 아래와 같이 처리.;
+ if missing(dlstcd) = 0 and missing(dlret) =1 then do; *** delisting code(사유)는 있고 delisting return이 missing이면, 아래와 같이 처리.;
   if dlstcd in (500, 520, 574, 580, 584) or (dlstcd>=551 and dlstcd<=573)  
    then dlret = -0.3; *** 위 사유들에 대해선 적당히 -0.3으로 처리;
   else dlret = -1; *** 그 외에는 -1 (-100%)로 처리;
@@ -255,7 +259,7 @@ data CRSP_M3;
  by date permco Meq; 
  retain ME;  
  if first.permco and last.permco then do; 
-  ME = Meq; *** Meq는 각 share class의 Market equity, ME는 각 회사(permco)의 Market equity의 합. 
+  ME = Meq; *** Meq는 각 share class의 Market equity, ME는 각 회사(permco)의 Market equity의 합. ;
   output; 
  end; 
  else do; 
@@ -295,7 +299,7 @@ run;
 proc sort data = BE_last_year; by permno t; run;
 
 
-** 여기서부턴 올려주신 파이썬 코드르 참조하면 됨. 이 위까지만 구현. ;
+** 여기서부턴 올려주신 파이썬 코드를 참조하면 됨. 이 위까지만 구현. ;
 
 data ME_BM; 
  merge ME_Jun (in = a) BE_last_year (in = b) ME_last_Dec (in = c); ** permno t ME_Jun ME_last_Dec BE_last_year ;
