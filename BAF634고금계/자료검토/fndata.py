@@ -60,8 +60,8 @@ class FnData:
         
         self.fn1_df = FnData._melt_dataguide_csv(filepath, encoding=encoding)
         self.items = self.fn1_df['Item Name '].unique()
-        self.symbol_to_name = self.fn1_df[['Symbol', 'Symbol Name']].drop_duplicates().set_index('Symbol').to_dict()['Symbol Name']
-        self.name_to_symbol = {v:k for k, v in self.symbol_to_name.items()}
+        self._symbol_to_name = self.fn1_df[['Symbol', 'Symbol Name']].drop_duplicates().set_index('Symbol').to_dict()['Symbol Name']
+        self._name_to_symbol = {v:k for k, v in self._symbol_to_name.items()}
 
         self.long_format_df = self._pivot_numerics()
         self._preprocess_numerics()
@@ -168,7 +168,7 @@ class FnData:
             values=item_name,
         )
     
-    def get_univ_list(self):
+    def get_universe(self):
         return self.univ_list
 
     def get_items(self):
@@ -221,5 +221,10 @@ class FnData:
         
         return data
 
+    def symbol_to_name(self, symbol_code):
+        return self._symbol_to_name[symbol_code]
+    
+    def name_to_symbol(self, symbol_name):
+        return self._name_to_symbol[symbol_name]
         
 
