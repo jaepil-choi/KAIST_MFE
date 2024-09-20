@@ -18,7 +18,7 @@ class FnData:
         '보통주자본금(천원)',
         '자본잉여금(천원)',
         '이익잉여금(천원)',
-        '자기주식(천원)',
+        '자기주식(천원)', 
         '이연법인세부채(천원)',
         '매출액(천원)',
         '매출원가(천원)',
@@ -64,13 +64,9 @@ class FnData:
         self.name_to_symbol = {v:k for k, v in self.symbol_to_name.items()}
 
         self.long_format_df = self._pivot_numerics()
+        self._preprocess_numerics()
 
-        # Filters
-        self.filter_dfs = [
-            self._pivot_nonnumeric('FnGuide Sector'), # 금융 제거
-            self._pivot_nonnumeric('관리종목여부'), # 정상/관리, 관리 제거
-            self._pivot_nonnumeric('거래정지여부'), # 정상/정지, 정지 제거
-        ]
+        self.filter_dfs = self._make_filters()
         self._apply_filters()
 
         self.univ_list = self._get_univ_list()
@@ -110,22 +106,47 @@ class FnData:
 
         return numeric_data
 
+    def _preprocess_numerics(self):
+
+        obj_cols = self.long_format_df.select_dtypes(include='object').columns
+        obj_cols = [obj_col for obj_col in obj_cols if obj_col in FnData.NUMERIC_DATA]
+        self.long_format_df[obj_cols] = self.long_format_df[obj_cols].replace(',', '', regex=True).infer_objects(copy=False)
+        self.long_format_df[obj_cols] = self.long_format_df[obj_cols].apply(pd.to_numeric, errors='raise') 
+        
+        return
+
+    def _make_filters(self):
+        # Filters
+        finance_sector = self._pivot_nonnumeric('FnGuide Sector')
+        finance_sector = finance_sector[finance_sector['FnGuide Sector'] == '금융']
+
+        is_under_supervision = self._pivot_nonnumeric('관리종목여부')
+        is_under_supervision = is_under_supervision[is_under_supervision['관리종목여부'] == '관리']
+
+        is_trading_halted = self._pivot_nonnumeric('거래정지여부') 
+        is_trading_halted = is_trading_halted[is_trading_halted['거래정지여부'] == '정지']
+
+        return [
+            finance_sector,
+            is_under_supervision,
+            is_trading_halted,
+        ]
+
     def _apply_filters(self):
         # left가 사용할 long-format df, right가 filter df
         # date-symbol을 key로 join
         # left join하여 매칭되는 것을 제거
 
         for filter_df in self.filter_dfs:
+            filter_df['_flag_right'] = 1
             self.long_format_df = self.long_format_df.merge(
                 filter_df,
-                on=['date', 'Symbol'],
+                on=['date', 'Symbol',],
                 how='left',
-                indicator='_merge',
                 suffixes=('', '_right')
             )
 
-            self.long_format_df = self.long_format_df[self.long_format_df['_merge'] == 'left_only']
-            self.long_format_df.drop(columns='_merge', inplace=True)
+            self.long_format_df = self.long_format_df[ self.long_format_df['_flag_right'].isnull() ] 
             self.long_format_df.drop(columns=[c for c in self.long_format_df.columns if c.endswith('_right')], inplace=True)
             self.long_format_df.reset_index(drop=True, inplace=True)
 
