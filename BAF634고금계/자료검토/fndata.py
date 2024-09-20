@@ -4,17 +4,16 @@ from pathlib import Path
 CWD = Path('.').resolve()
 DATA_DIR = CWD / 'data'
 
-FN1 = DATA_DIR / '고금계과제1_v3.0_201301-202408.csv'
-
-class FNData:
+class FnData:
 
     NUMERIC_DATA = [
         '종가(원)',
         '수정주가(원)',
         '수정계수',
         '수익률 (1개월)(%)',
-        '시가총액 (상장예정주식수 포함)(백만원)',
-        '시가총액 (보통-상장예정주식수 포함)(백만원)',
+        # '상장주식수 (보통)(주)',
+        # '시가총액 (상장예정주식수 포함)(백만원)',
+        # '시가총액 (보통-상장예정주식수 포함)(백만원)',
         '기말발행주식수 (보통)(주)',
         '보통주자본금(천원)',
         '자본잉여금(천원)',
@@ -28,21 +27,57 @@ class FNData:
         '총자산(천원)'
         ]
 
+    UNIV_REFERENCE_ITEMS = [
+        '수정주가(원)',
+        '종가(원)',
+        '수익률 (1개월)(%)',
+        '수익률 (%)'
+        ]
+    
+    DIV_BY_100 = [
+        '수익률 (%)',
+        '수익률 (1개월)(%)',
+        ]
 
-    def __init__(self, filepath=None, encoding='utf-8'):
+    MULTIPLY_BY_1000 = [
+        '보통주자본금(천원)',
+        '자본잉여금(천원)',
+        '이익잉여금(천원)',
+        '자기주식(천원)',
+        '이연법인세부채(천원)',
+        '매출액(천원)',
+        '매출원가(천원)',
+        '이자비용(천원)',
+        '영업이익(천원)',
+        '총자산(천원)',
+        ]
+
+    FN_INDEX_COLS = ['date', 'Symbol', 'Symbol Name', 'Kind', 'Frequency',]
+
+    def __init__(self, filepath, encoding='utf-8'):
         if not filepath:
-            filepath = FN1
+            raise ValueError("파일 경로를 입력해 주세요 예: ./data/고금계과제1.csv")
         
-        self.fn1_df = FNData._preprocess_dataguide_csv(filepath, encoding=encoding)
+        self.fn1_df = FnData._melt_dataguide_csv(filepath, encoding=encoding)
         self.items = self.fn1_df['Item Name '].unique()
         self.symbol_to_name = self.fn1_df[['Symbol', 'Symbol Name']].drop_duplicates().set_index('Symbol').to_dict()['Symbol Name']
         self.name_to_symbol = {v:k for k, v in self.symbol_to_name.items()}
 
-        self._preprocess1()
+        self.long_format_df = self._pivot_numerics()
+
+        # Filters
+        self.filter_dfs = [
+            self._pivot_nonnumeric('FnGuide Sector'), # 금융 제거
+            self._pivot_nonnumeric('관리종목여부'), # 정상/관리, 관리 제거
+            self._pivot_nonnumeric('거래정지여부'), # 정상/정지, 정지 제거
+        ]
+        self._apply_filters()
+
+        self.univ_list = self._get_univ_list()
 
     
     @staticmethod
-    def _preprocess_dataguide_csv(
+    def _melt_dataguide_csv(
             fn_file_path, 
             cols=['Symbol', 'Symbol Name', 'Kind', 'Item', 'Item Name ', 'Frequency',], # 날짜가 아닌 컬럼들
             skiprows=8, 
@@ -53,48 +88,64 @@ class FNData:
 
         return fn_df
     
-    @staticmethod
-    def _get_panel_df(molten_df, item_name):
-        panel_df = molten_df.loc[molten_df['Item Name '] == item_name]
-        panel_df = panel_df.pivot(index='date', columns='Symbol', values='value')
-        panel_df = panel_df.reset_index()
+    def _pivot_nonnumeric(self, item_name):
+        # string value를 가진 FnGuide Sector의 경우 pivot_table이 안됨. 
+        nonnumeric_data = self.fn1_df[self.fn1_df['Item Name '] == item_name].pivot(
+            index=FnData.FN_INDEX_COLS,
+            columns='Item Name ',
+            values='value',
+        ).reset_index()
+
+        return nonnumeric_data
+
+    def _pivot_numerics(self):
+        # numeric data를 가진 경우 pivot_table이 가능. non-numeric은 알아서 빠짐.
+        numeric_data = self.fn1_df.pivot_table(
+            index=FnData.FN_INDEX_COLS,
+            columns='Item Name ',
+            values='value',
+            aggfunc='first',
+            dropna=True, # False로 하면 memory error남
+        ).reset_index()
+
+        return numeric_data
+
+    def _apply_filters(self):
+        # left가 사용할 long-format df, right가 filter df
+        # date-symbol을 key로 join
+        # left join하여 매칭되는 것을 제거
+
+        for filter_df in self.filter_dfs:
+            self.long_format_df = self.long_format_df.merge(
+                filter_df,
+                on=['date', 'Symbol'],
+                how='left',
+                indicator='_merge',
+                suffixes=('', '_right')
+            )
+
+            self.long_format_df = self.long_format_df[self.long_format_df['_merge'] == 'left_only']
+            self.long_format_df.drop(columns='_merge', inplace=True)
+            self.long_format_df.drop(columns=[c for c in self.long_format_df.columns if c.endswith('_right')], inplace=True)
+            self.long_format_df.reset_index(drop=True, inplace=True)
+
+        return 
+
+    def _get_univ_list(self, reference_item='수정주가(원)'):
+        assert reference_item in FnData.UNIV_REFERENCE_ITEMS, f"유니버스 구축을 위해 {FnData.UNIV_REFERENCE_ITEMS} 중 하나가 필요합니다." 
+        only_existing = self.long_format_df.groupby('Symbol').filter(
+            lambda x: x[reference_item].notnull().any()
+        )
+
+        return only_existing['Symbol'].unique()
         
-        panel_df = panel_df.set_index('date', inplace=False)
-        panel_df.sort_index(inplace=True)
-        
-        return panel_df 
     
-    @staticmethod
-    def _filter_univ(univ_list, panel_df, is_copy=True):
-        if is_copy:
-            return panel_df[univ_list].copy()
-        else:
-            return panel_df[univ_list]
-
-    def _preprocess1(self):
-        adj_close_temp = FNData._get_panel_df(self.fn1_df, '수정주가(원)')
-        adj_close_temp.dropna(axis=1, how='all', inplace=True)
-        
-        self.univ_list = adj_close_temp.columns
-
-        sector_df = FNData._filter_univ(self.univ_list, FNData._get_panel_df(self.fn1_df, 'FnGuide Sector') )
-        is_under_supervision_df = FNData._filter_univ(self.univ_list, FNData._get_panel_df(self.fn1_df, '관리종목여부') )
-        is_trading_halt_df = FNData._filter_univ(self.univ_list, FNData._get_panel_df(self.fn1_df, '거래정지여부') )
-
-        is_under_supervision_mapping = {
-            '정상': True,
-            '관리': False,
-        }
-        is_trading_halt_mapping = {
-            '정상': True,
-            '정지': False,
-        }
-
-        is_under_supervision_df = is_under_supervision_df.replace(is_under_supervision_mapping).infer_objects(copy=False)
-        is_trading_halt_df = is_trading_halt_df.replace(is_trading_halt_mapping).infer_objects(copy=False)
-        
-        self.univ_df = ~sector_df.isnull() & (sector_df != '금융') & is_under_supervision_df & is_trading_halt_df
-        self.univ_list = self.univ_df.columns
+    def _get_wide_format_df(self, item_name):
+        return self.long_format_df.pivot_table(
+            index='date',
+            columns='Symbol',
+            values=item_name,
+        )
     
     def get_univ_list(self):
         return self.univ_list
@@ -102,25 +153,52 @@ class FNData:
     def get_items(self):
         return self.items
 
-    def get_data(self, item_name):
-        assert item_name in self.items, f"{item_name} is not in the item list"
+    def get_data(self, item: list | str | None =None, multiindex: bool =True):
 
-        panel_df = FNData._get_panel_df(self.fn1_df, item_name)
-        panel_df = FNData._filter_univ(self.univ_list, panel_df)
+        if isinstance(item, str):
+            assert item in self.items, f"{item} is not in the item list"
 
-        if item_name in FNData.NUMERIC_DATA:
-            obj_cols = panel_df.select_dtypes('object').columns
-            panel_df[obj_cols] = panel_df[obj_cols].replace(',', '', regex=True).infer_objects(copy=False) 
-            panel_df[obj_cols] = panel_df[obj_cols].apply(pd.to_numeric, errors='coerce')
-        
-        if item_name == '수익률 (1개월)(%)':
-            panel_df = panel_df / 100
-        
-        if item_name == '시가총액 (상장예정주식수 포함)(백만원)' or item_name == '시가총액 (보통-상장예정주식수 포함)(백만원)':
-            panel_df = panel_df * 100
-        
-        masked_df = panel_df * self.univ_df
+            data = self._get_wide_format_df(item)
+            
+            if item in FnData.DIV_BY_100:
+                data = data / 100
+            elif item in FnData.MULTIPLY_BY_1000:
+                data = data * 1000
 
-        return masked_df
+        elif isinstance(item, list):
+            for i in item:
+                assert i in self.items, f"{i} is not in the item list"
+            
+            data = self.long_format_df.loc[:, FnData.FN_INDEX_COLS + item]
+            for col in data.columns:
+                if col in FnData.DIV_BY_100:
+                    data[col] = data[col] / 100
+                elif col in FnData.MULTIPLY_BY_1000:
+                    data[col] = data[col] * 1000
+            
+            if multiindex:
+                data.drop(columns=['Symbol Name', 'Kind', 'Frequency'], inplace=True)
+                data.set_index(['date', 'Symbol'], inplace=True)
+                data.index.name = None
+        
+        elif item is None:
+            data = self.long_format_df.copy()
+            if multiindex:
+                data.drop(columns=['Symbol Name', 'Kind', 'Frequency'], inplace=True)
+                data.set_index(['date', 'Symbol'], inplace=True)  
+                data.index.name = None  
+        
+        else:
+            raise ValueError("""
+                             item은 
+
+                             - str (1개 item만 wide-format 반환) 
+                             - list (선택한 item들 long-format 반환)
+                             - None (전체 long-format 반환)
+
+                             중 하나여야 합니다.""")
+        
+        return data
+
         
 
