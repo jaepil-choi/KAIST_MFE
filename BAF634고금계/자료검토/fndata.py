@@ -4,7 +4,7 @@ from pathlib import Path
 CWD = Path('.').resolve()
 DATA_DIR = CWD / 'data'
 
-class FnData:
+class FnStockData:
 
     NUMERIC_DATA = [
         '종가(원)',
@@ -57,7 +57,7 @@ class FnData:
         if not filepath:
             raise ValueError("파일 경로를 입력해 주세요 예: ./data/고금계과제1.csv")
         
-        self.fn1_df = FnData._melt_dataguide_csv(filepath, encoding=encoding)
+        self.fn1_df = FnStockData._melt_dataguide_csv(filepath, encoding=encoding)
         self.items = self.fn1_df['Item Name '].unique()
         self._symbol_to_name = self.fn1_df[['Symbol', 'Symbol Name']].drop_duplicates().set_index('Symbol').to_dict()['Symbol Name']
         self._name_to_symbol = {v:k for k, v in self._symbol_to_name.items()}
@@ -77,16 +77,20 @@ class FnData:
             cols=['Symbol', 'Symbol Name', 'Kind', 'Item', 'Item Name ', 'Frequency',], # 날짜가 아닌 컬럼들
             skiprows=8, 
             encoding="cp949",
+            parse_date=True,
             ):
         fn_df = pd.read_csv(fn_file_path, encoding=encoding, skiprows=skiprows, thousands=",")
         fn_df = fn_df.melt(id_vars=cols, var_name="date", value_name="value")
+        
+        if parse_date:
+            fn_df['date'] = pd.to_datetime(fn_df['date'], errors='raise')
 
         return fn_df
     
     def _pivot_nonnumeric(self, item_name):
         # string value를 가진 FnGuide Sector의 경우 pivot_table이 안됨. 
         nonnumeric_data = self.fn1_df[self.fn1_df['Item Name '] == item_name].pivot(
-            index=FnData.FN_INDEX_COLS,
+            index=FnStockData.FN_INDEX_COLS,
             columns='Item Name ',
             values='value',
         ).reset_index()
@@ -96,7 +100,7 @@ class FnData:
     def _pivot_numerics(self):
         # numeric data를 가진 경우 pivot_table이 가능. non-numeric은 알아서 빠짐.
         numeric_data = self.fn1_df.pivot_table(
-            index=FnData.FN_INDEX_COLS,
+            index=FnStockData.FN_INDEX_COLS,
             columns='Item Name ',
             values='value',
             aggfunc='first',
@@ -108,7 +112,7 @@ class FnData:
     def _preprocess_numerics(self):
 
         obj_cols = self.long_format_df.select_dtypes(include='object').columns
-        obj_cols = [obj_col for obj_col in obj_cols if obj_col in FnData.NUMERIC_DATA]
+        obj_cols = [obj_col for obj_col in obj_cols if obj_col in FnStockData.NUMERIC_DATA]
         self.long_format_df[obj_cols] = self.long_format_df[obj_cols].replace(',', '', regex=True).infer_objects(copy=False)
         self.long_format_df[obj_cols] = self.long_format_df[obj_cols].apply(pd.to_numeric, errors='raise') 
         
@@ -152,7 +156,7 @@ class FnData:
         return 
 
     def _get_univ_list(self, reference_item='수익률 (1개월)(%)'):
-        assert reference_item in FnData.UNIV_REFERENCE_ITEMS, f"유니버스 구축을 위해 {FnData.UNIV_REFERENCE_ITEMS} 중 하나가 필요합니다." 
+        assert reference_item in FnStockData.UNIV_REFERENCE_ITEMS, f"유니버스 구축을 위해 {FnStockData.UNIV_REFERENCE_ITEMS} 중 하나가 필요합니다." 
         only_existing = self.long_format_df.groupby('Symbol').filter(
             lambda x: x[reference_item].notnull().any()
         )
@@ -177,27 +181,27 @@ class FnData:
 
         if isinstance(item, str):
             assert item in self.items, f"{item} is not in the item list"
-            assert item in FnData.NUMERIC_DATA, f"{item} is not a numeric data"
+            assert item in FnStockData.NUMERIC_DATA, f"{item} is not a numeric data"
 
             data = self._get_wide_format_df(item)
             data = data.reindex(columns=self.univ_list)
             
-            if item in FnData.DIV_BY_100:
+            if item in FnStockData.DIV_BY_100:
                 data = data / 100
-            elif item in FnData.MULTIPLY_BY_1000:
+            elif item in FnStockData.MULTIPLY_BY_1000:
                 data = data * 1000
 
         elif isinstance(item, list):
             for i in item:
                 assert i in self.items, f"{i} is not in the item list"
-                assert i in FnData.NUMERIC_DATA, f"{i} is not a numeric data"
+                assert i in FnStockData.NUMERIC_DATA, f"{i} is not a numeric data"
             
-            data = self.long_format_df.loc[:, FnData.FN_INDEX_COLS + item]
+            data = self.long_format_df.loc[:, FnStockData.FN_INDEX_COLS + item]
             
             for col in data.columns:
-                if col in FnData.DIV_BY_100:
+                if col in FnStockData.DIV_BY_100:
                     data[col] = data[col] / 100
-                elif col in FnData.MULTIPLY_BY_1000:
+                elif col in FnStockData.MULTIPLY_BY_1000:
                     data[col] = data[col] * 1000
             
             if multiindex:
@@ -238,4 +242,39 @@ class FnData:
     def name_to_symbol(self, symbol_name):
         return self._name_to_symbol[symbol_name]
         
+class FnMarketData(FnStockData):
+    # 수익률만 있다고 가정
 
+    def __init__(self, filepath, encoding='utf-8'):
+        if not filepath:
+            raise ValueError("파일 경로를 입력해 주세요 예: ./data/고금계과제1.csv")
+        
+        self.fn1_df = FnStockData._melt_dataguide_csv(filepath, encoding=encoding)
+        self.items = self.fn1_df['Item Name '].unique()
+        self.long_format_df = self._pivot_numerics()
+        self._preprocess_numerics() # 안넣어도 무방. 그러나 일관성을 위해 넣음
+
+    def get_data(self, format='long', multiindex: bool =True):
+        assert format in ['long', 'wide'], "format은 'long' 또는 'wide' 중 하나여야 합니다."
+
+        if format == 'long':
+            data = self.long_format_df.copy()
+
+            if multiindex:
+                data.drop(columns=['Symbol',], inplace=True)
+                data.index.name = None
+                data.set_index(['date', 'Symbol Name'], inplace=True)
+
+        elif format == 'wide':
+            data = self.long_format_df.pivot_table(
+                index='date',
+                columns='Symbol Name',
+                values='수익률 (1개월)(%)',
+            )
+        
+        data = data / 100
+
+        return data
+
+
+        
