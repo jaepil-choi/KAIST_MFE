@@ -28,10 +28,9 @@ class FnData:
         ]
 
     UNIV_REFERENCE_ITEMS = [
-        '수정주가(원)',
-        '종가(원)',
-        '수익률 (1개월)(%)',
-        '수익률 (%)'
+        # '수정주가(원)', # 2624
+        # '종가(원)', # 2624
+        '수익률 (1개월)(%)', # 2616
         ]
     
     DIV_BY_100 = [
@@ -52,7 +51,7 @@ class FnData:
         '총자산(천원)',
         ]
 
-    FN_INDEX_COLS = ['date', 'Symbol', 'Symbol Name', 'Kind', 'Frequency',]
+    FN_INDEX_COLS = ['date', 'Symbol', 'Symbol Name',]
 
     def __init__(self, filepath, encoding='utf-8'):
         if not filepath:
@@ -152,7 +151,7 @@ class FnData:
 
         return 
 
-    def _get_univ_list(self, reference_item='수정주가(원)'):
+    def _get_univ_list(self, reference_item='수익률 (1개월)(%)'):
         assert reference_item in FnData.UNIV_REFERENCE_ITEMS, f"유니버스 구축을 위해 {FnData.UNIV_REFERENCE_ITEMS} 중 하나가 필요합니다." 
         only_existing = self.long_format_df.groupby('Symbol').filter(
             lambda x: x[reference_item].notnull().any()
@@ -178,8 +177,10 @@ class FnData:
 
         if isinstance(item, str):
             assert item in self.items, f"{item} is not in the item list"
+            assert item in FnData.NUMERIC_DATA, f"{item} is not a numeric data"
 
             data = self._get_wide_format_df(item)
+            data = data.reindex(columns=self.univ_list)
             
             if item in FnData.DIV_BY_100:
                 data = data / 100
@@ -189,8 +190,10 @@ class FnData:
         elif isinstance(item, list):
             for i in item:
                 assert i in self.items, f"{i} is not in the item list"
+                assert i in FnData.NUMERIC_DATA, f"{i} is not a numeric data"
             
             data = self.long_format_df.loc[:, FnData.FN_INDEX_COLS + item]
+            
             for col in data.columns:
                 if col in FnData.DIV_BY_100:
                     data[col] = data[col] / 100
@@ -198,16 +201,22 @@ class FnData:
                     data[col] = data[col] * 1000
             
             if multiindex:
-                data.drop(columns=['Symbol Name', 'Kind', 'Frequency'], inplace=True)
-                data.set_index(['date', 'Symbol'], inplace=True)
+                data.drop(columns=['Symbol Name',], inplace=True)
                 data.index.name = None
+                data.set_index(['date', 'Symbol'], inplace=True)
+            
+            data = data.reindex(self.univ_list, level=1)
+                
         
         elif item is None:
             data = self.long_format_df.copy()
+            
             if multiindex:
-                data.drop(columns=['Symbol Name', 'Kind', 'Frequency'], inplace=True)
-                data.set_index(['date', 'Symbol'], inplace=True)  
-                data.index.name = None  
+                data.drop(columns=['Symbol Name',], inplace=True)
+                data.index.name = None
+                data.set_index(['date', 'Symbol'], inplace=True) 
+            
+            data = data.reindex(self.univ_list, level=1)
         
         else:
             raise ValueError("""
@@ -217,7 +226,9 @@ class FnData:
                              - list (선택한 item들 long-format 반환)
                              - None (전체 long-format 반환)
 
-                             중 하나여야 합니다.""")
+                             중 하나여야 합니다.
+                             (numeric data만 선택 가능)
+                             """)
         
         return data
 
