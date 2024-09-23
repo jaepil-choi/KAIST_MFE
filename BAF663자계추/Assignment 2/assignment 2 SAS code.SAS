@@ -57,7 +57,7 @@ proc import out = CPI (rename = (cpiaucsl = cpi observation_date = cpi_date))
     dbms = xls replace; 
     sheet = "Sheet1"; 
     namerow = 11; 
-    datarow = 12; 
+    datarow = 12; ** 데이터값이 어디서 시작하는지... skiprows= 와 같다. ;
 run; 
 
 * CPI in June of each year;
@@ -72,7 +72,7 @@ run;
 
 * Calculate Mktcap_CPI, Size, and log_BM variables;
 data monthly_stock_data2; 
-    set monthly_stock_data2; 
+    set monthly_stock_data2; ** beta까지 넣어둔 assignment 1 data를 가져온다. ;
     if month(date) > 6 then t = year(date); 
     else t = year(date) - 1; 
 run; 
@@ -86,11 +86,12 @@ data monthly_stock_data3;
     by t; 
     if a; 
 
-    ME_Jun_CPI = (ME_Jun / cpi) * &CPI_2012; 
-    size = log(ME_Jun); 
+    ME_Jun_CPI = (ME_Jun / cpi) * &CPI_2012; ** cpi-adjusted ME ;
+    size = log(ME_Jun); ** size도 log 씌워줌 ;
     size_CPI = log(ME_Jun_CPI); 
     log_BM = log(BM); 
-    keep permno date year exchcd siccd retadj eretadj altprc_lag1 ME_lag1 b_mkt size size_CPI BM log_BM; 
+    keep permno date year exchcd siccd retadj eretadj altprc_lag1 ME_lag1 
+    b_mkt size size_CPI BM log_BM; ** 이 5개가 중요한 데이터 ;
 run; 
 
 * SAS 4: Winsorize stock characteristic variables ****************************************;
@@ -108,7 +109,7 @@ run;
 
 proc univariate data = monthly_stock_data3 noprint; 
     by date; 
-    var b_mkt_o size_o size_CPI_o BM_o log_BM_o; 
+    var b_mkt_o size_o size_CPI_o BM_o log_BM_o; ** _o 붙은게 winsorize 된 것들 ;
     output out = bounds pctlpts = 0.5 99.5 pctlpre = b_mkt_ size_ size_CPI_ BM_ log_BM_; 
 run; 
 
@@ -150,7 +151,7 @@ run;
 ods exclude none; 
 
 * Calculate the time-series-means of the summary statistics for the variables in the "varlist";
-proc sort data = stats_by_month; 
+proc sort data = stats_by_month; ** cross sectional로 구해놓은 bm mean들을 한 번 더 time-series로 mean ;
     by variable date; 
 run; 
 
