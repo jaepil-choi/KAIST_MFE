@@ -4,10 +4,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
+# uniform에서 뽑는
+u1 = np.random.rand(10000) # 길이
+u2 = np.random.rand(10000) # 각도
 
-u1 = np.random.rand(10000)
-u2 = np.random.rand(10000)
-
+# 원 그리며 극좌표 변환
 z1 = np.sqrt(-2*np.log(u1))*np.cos(2*np.pi*u2)
 z2 = np.sqrt(-2*np.log(u1))*np.sin(2*np.pi*u2)
 
@@ -29,4 +30,8 @@ print("Std = ", z.std())
 print("Skewness = ", z.skew())
 print("Kurtosis = ", z.kurt())
 
-
+# 아... 너무 간단해서 좋은데....
+# 효율성이 좋지가 않다. 
+# 왜? 삼각함수, 로그함수 계산하는 것이 효율적이지 않다.
+# 그래서 더 개선된 방법이 필요하다.
+# %%
