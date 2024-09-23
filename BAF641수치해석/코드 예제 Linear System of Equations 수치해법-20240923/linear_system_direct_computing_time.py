@@ -1,3 +1,5 @@
+# 왜 이렇게 여러개 배우는지, 효율성 차이나는거 보여준다. 
+
 #%%
 import numpy as np
 from scipy.linalg import lu
@@ -6,7 +8,7 @@ import time
 
 #
 n = 3000
-A = np.random.randn(n,n)
+A = np.random.randn(n,n) # 상당히 큰 행렬
 b = np.random.randn(n)
 
 ###################################
@@ -87,3 +89,20 @@ Ainv = np.linalg.inv(A)
 x = Ainv.dot(b)
 t1 = time.time()
 print("Time = ", t1-t0)
+# %%
+
+# 효율성 좋은 것부터 나열. (lower is better)
+# Cholesky < LU < QR < A inverse < SVD
+# SVD는 정말 느리다. 어쩔 수 없을 때만 쓰자. 
+# 엥? 왜 이렇게 A inverse가 괜찮지? 할 수 있는데, 
+# 이걸 inverse 구하는게 이미 numpy에서 최적화가 되어있어서...
+# 반대로 교수님이 짜신 forward/backward subsitution은 최적화가 안되어있어서 느린 것.
+# 갓 Numpy... 그냥 solve() 하면 지가 알아서 제일 빠르고 풀 수 있는걸로 찾는다. 
+
+### Solution from np.linalg.solve
+t0 = time.time()
+x = np.linalg.solve(A, b)
+t1 = time.time()
+print("Solution x from np.linalg.solve:")
+print("Time = ", t1-t0)
+# %%

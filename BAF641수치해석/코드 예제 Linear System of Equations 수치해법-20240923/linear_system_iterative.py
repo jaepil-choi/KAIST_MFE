@@ -17,11 +17,11 @@ print(sol)
 n = len(b)
 x = np.ones(n) #initial value
 idx = np.arange(n)
-iter = 50
+iter = 50 # 원래는 iteration을 정하는게 아니라 수렴할때 까지 하고 수렴 조건을 정하는 것임. 
 xs = np.empty((iter,n))
 for j in range(iter):
     for i in range(n):
-        mask = idx!=i
+        mask = idx!=i # 마스킹. 업데이트하려는 i번째를 제외하고 가져온다. 
         x[i] = (b[i] - (A[i,mask] * x[mask]).sum()) / A[i,i]
     xs[j,:] = x
 
@@ -31,7 +31,7 @@ for i in range(n):
 
 #%%
 #SOR
-omega = 0.8
+omega = 0.8 # 이거 바꾸면 변화 볼 수 있음. 
 n = len(b)
 x = np.ones(n) #initial value
 iter = 50
@@ -44,3 +44,4 @@ for j in range(iter):
 plt.plot(xs,'.-')
 for i in range(n):
     plt.plot(np.arange(iter), np.ones(iter)*sol[i], ":y")
+# %%
