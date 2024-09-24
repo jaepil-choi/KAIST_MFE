@@ -209,6 +209,8 @@ run;
 
 * SAS 7: Dependent-sort stocks into 25 portfolios based on size and BM *******************************;
 
+************** SAS7 부분은 코딩 안해도 됨. ;
+
 * Check if we have many stocks with the same value of size or BM in any month;
 data test1; 
     set monthly_stock_data3 (keep = date size_o); 
@@ -267,6 +269,7 @@ data test2;
 run; 
 
 * Calculate size breakpoints as 20th, 40th, 60th, and 80th size percentiles among NYSE stocks in each month;
+*** NYSE stock들만 가지고 breakpoint를 찾아라. ;
 proc univariate data = monthly_stock_data4 (where = (exchcd in (1, 31))) noprint; 
     by date; 
     var size; 
@@ -286,6 +289,8 @@ data monthly_stock_data5;
 run; 
 
 * Calculate BM breakpoints as 20th, 40th, 60th, and 80th BM percentiles among all stocks in each size sorted portfolio in each month;
+** 여긴 또 NYSE만 쓰지 않고 전체 stock을 썼다. ;
+** 사이즈는 NYSE와 NASDAQ이 서로 크게 다르지만, BM은 크게 다르지 않다. 라는 가정을 깔아둔 것.;
 proc sort data = monthly_stock_data5; 
     by date p1; 
 run; 
@@ -323,7 +328,7 @@ proc sort data = monthly_stock_data6;
 run; 
 
 proc means data = monthly_stock_data6 n nolabels noprint; 
-    by date p1 p2; 
+    by date p1 p2; ** 서로 다른 permno들이 각 p1, p2에 몇개씩 있는지 count ;
     var permno; 
     output out = nstocks_per_p n = nstocks; 
 run; 
@@ -332,7 +337,7 @@ proc sort data = nstocks_per_p;
     by p1 p2; 
 run; 
 
-proc means data = nstocks_per_p mean nolabels noprint; 
+proc means data = nstocks_per_p mean nolabels noprint; ** nstocks의 time series 평균을 구한다고 함.  ;
     by p1 p2; 
     var nstocks; 
     output out = nstocks_per_p (drop = _TYPE_) mean = ave_nstocks; 
