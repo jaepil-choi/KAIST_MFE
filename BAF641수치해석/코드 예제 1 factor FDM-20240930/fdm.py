@@ -5,6 +5,9 @@ from scipy.linalg import solve_banded, solve, solveh_banded
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt 
 
+# explicit은 따로 만들었다. 
+# 왜? tri-diagonal matrix가 곱해질 때 따로 계산하는 것이 더 빠르기 때문이다.
+# 안그러면 0인 부분들이 계속 곱해지기 때문에 계산량이 늘어난다.
 def exfdm_vanilla_option(s0, k, r, q, t, vol, optionType, maxS, N, M):
     ds = maxS / N
     dt = t / M
@@ -12,14 +15,14 @@ def exfdm_vanilla_option(s0, k, r, q, t, vol, optionType, maxS, N, M):
 
     i = np.arange(N+1)
     s = i * ds
-    a = dt*(vol*s[1:-1])**2 / (2*ds**2)
-    b = dt*(r-q)*s[1:-1] / (2*ds)
+    a = dt*(vol*s[1:-1])**2 / (2*ds**2) # 맨 앞과 맨 뒤는 쓰지 않는다. 
+    b = dt*(r-q)*s[1:-1] / (2*ds) # 마찬가지. 
     d, m, u = a-b, -2*a-dt*r, a+b
 
-    v = np.maximum(callOrPut*(s-k), 0)
+    v = np.maximum(callOrPut*(s-k), 0) # terminal condition. (만기에서의 payoff)
 
     for j in range(M-1,-1,-1):
-        temp = d * v[:-2] + (1 + m) * v[1:-1] + u * v[2:]
+        temp = d * v[:-2] + (1 + m) * v[1:-1] + u * v[2:] # v값 업데이트
         v[0] = np.maximum(callOrPut*(0 - k * np.exp(-r * (M - j) * dt)), 0)
         v[N] = np.maximum(callOrPut*(maxS - k * np.exp(-r * (M - j) * dt)), 0)
         v[1:-1] = temp
@@ -57,7 +60,8 @@ def fdm_vanilla_option(s0, k, r, q, t, vol, optionType, maxS, N, M, theta=1):
 
     v = np.maximum(callOrPut*(s-k), 0)
     for j in range(M-1,-1,-1):    
-        #temp = Ap @ v[1:-1] + theta*B @ v[[0,-1]]
+        # temp = Ap @ v[1:-1] + theta*B @ v[[0,-1]] # 이렇게 하면 계산량이 늘어난다. 특히 Ap @ v[1:-1] 부분.
+        # 속도가 약 2배 차이남
         temp = (1-theta)*d * v[:-2] + (1 + (1-theta)*m) * v[1:-1] + (1-theta)*u * v[2:]
         temp[0] += theta*d[0]*v[0]
         temp[-1] += theta*u[-1]*v[-1]
