@@ -1,0 +1,710 @@
+815  * SAS 1: Make a data request in Beta Suite by WRDS
+816  to get the daily market betas for US common stocks;
+817  * Download and rename the output data;
+818  * Move the data file to my_lib folder;
+819
+820
+821
+822
+823
+824  * SAS 2: Add the beta measure to the monthly stock data set *******************************;
+825
+826  * Keep only the last observation of each month to get monthly betas;
+827  data daily_beta_data;
+828      set my_lib.daily_beta_data;
+829      t = intnx('month',date,1,'end');
+830      format t yymmddn8.;
+831  run;
+
+NOTE: There were 67276715 observations read from the data set MY_LIB.DAILY_BETA_DATA.
+NOTE: The data set WORK.DAILY_BETA_DATA has 67276715 observations and 11 variables.
+NOTE: DATA statement used (Total process time):
+      real time           20.68 seconds
+      cpu time            20.26 seconds
+
+
+832  proc sort data = daily_beta_data; by permno t date; run;
+
+NOTE: There were 67276715 observations read from the data set WORK.DAILY_BETA_DATA.
+NOTE: The data set WORK.DAILY_BETA_DATA has 67276715 observations and 11 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           31.68 seconds
+      cpu time            47.42 seconds
+
+
+833  data monthly_beta_data (keep = permno t b_mkt);
+834      set daily_beta_data;
+835      by permno t date;
+836      if last.t;
+837  run;
+
+NOTE: There were 67276715 observations read from the data set WORK.DAILY_BETA_DATA.
+NOTE: The data set WORK.MONTHLY_BETA_DATA has 3225294 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           17.95 seconds
+      cpu time            15.93 seconds
+
+
+838
+839  * Generate the month-end date of each monthly stock observation;
+840  data monthly_stock_data1;
+841      set my_lib.assignment1_data;
+842      t = intnx('month',date,0,'end');
+843      format t yymmddn8.;
+844  run;
+
+NOTE: There were 1983365 observations read from the data set MY_LIB.ASSIGNMENT1_DATA.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA1 has 1983365 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.71 seconds
+      cpu time            0.68 seconds
+
+
+845  proc sort data = monthly_stock_data1; by permno t; run;
+
+NOTE: There were 1983365 observations read from the data set WORK.MONTHLY_STOCK_DATA1.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA1 has 1983365 observations and 12 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.42 seconds
+      cpu time            1.06 seconds
+
+
+846
+847  * Add beta information to the monthly stock data set;
+848  data monthly_stock_data2;
+849      merge monthly_stock_data1 (in = a) monthly_beta_data (in = b);
+850      by permno t;
+851      if a and b and missing(b_mkt) = 0;
+852  run;
+
+NOTE: There were 1983365 observations read from the data set WORK.MONTHLY_STOCK_DATA1.
+NOTE: There were 3225294 observations read from the data set WORK.MONTHLY_BETA_DATA.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA2 has 1972533 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.70 seconds
+      cpu time            0.71 seconds
+
+
+853
+854
+855
+856
+857
+858
+859  * SAS 3: Generate Mktcap_CPI and Size variables ******************************************;
+860
+861  * Load CPI data;
+862  proc import out = CPI (rename = (cpiaucsl = cpi observation_date = cpi_date))
+863      datafile = "&my_directory\CPIAUCSL.xls"
+864      dbms = xls replace;
+865      sheet = "Sheet1";
+866      namerow = 11;
+867      datarow = 12;
+868  run;
+
+NOTE: The import data set has 873 observations and 2 variables.
+NOTE: WORK.CPI data set was successfully created.
+NOTE: PROCEDURE IMPORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+
+
+869
+870  * CPI in June of each year;
+871  data CPI_Jun;
+872      set CPI (where = (month(cpi_date) = 6));
+873      t = year(cpi_date);
+874      keep t cpi;
+875  run;
+
+NOTE: There were 73 observations read from the data set WORK.CPI.
+      WHERE MONTH(cpi_date)=6;
+NOTE: The data set WORK.CPI_JUN has 73 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.06 seconds
+
+
+876  * CPI in Dec, 2012;
+877  %let CPI_2012 = 231.221;
+878
+879  * Calculate Mktcap_CPI, Size, and log_BM variables;
+880  data monthly_stock_data2;
+881      set monthly_stock_data2;
+882      if month(date)>6 then t = year(date);
+883      else t = year(date)-1;
+884  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA2.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA2 has 1972533 observations and 13 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.44 seconds
+      cpu time            0.42 seconds
+
+
+885  proc sort data = monthly_stock_data2; by t date permno; run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA2.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA2 has 1972533 observations and 13 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.48 seconds
+      cpu time            1.39 seconds
+
+
+886  data monthly_stock_data3;
+887      merge monthly_stock_data2 (in = a) CPI_Jun (in = b);
+888      by t;
+889      if a;
+890
+891      ME_Jun_CPI = (ME_Jun/cpi)*&CPI_2012;
+892      size = log(ME_Jun);
+893      size_CPI = log(ME_Jun_CPI);
+894      log_BM = log(BM);
+895      keep permno date year exchcd siccd retadj eretadj altprc_lag1 ME_lag1
+896          b_mkt size size_CPI BM log_BM;
+897  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA2.
+NOTE: There were 73 observations read from the data set WORK.CPI_JUN.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA3 has 1972533 observations and 14 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.46 seconds
+      cpu time            0.46 seconds
+
+
+898
+899
+900
+901
+902  * SAS 4: Winsorize stock characteristic variables ****************************************;
+903
+904  * Rename characteristic variables;
+905  data monthly_stock_data3;
+906      set monthly_stock_data3;
+907      rename b_mkt = b_mkt_o size = size_o size_CPI = size_CPI_o BM = BM_o log_BM = log_BM_o;
+908  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA3.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA3 has 1972533 observations and 14 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.30 seconds
+      cpu time            0.29 seconds
+
+
+909
+910  * Calculate 0.5% and 99.5% level of each characteristic variable
+911  on a monthly basis;
+912  proc sort data = monthly_stock_data3; by date; run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA3.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA3 has 1972533 observations and 14 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.46 seconds
+      cpu time            0.98 seconds
+
+
+913  proc univariate data = monthly_stock_data3 noprint;
+914      by date;
+915      var b_mkt_o size_o size_CPI_o BM_o log_BM_o;
+916      output out = bounds pctlpts = 0.5 99.5 pctlpre = b_mkt_ size_ size_CPI_ BM_ log_BM_;
+917  run;
+
+NOTE: The data set WORK.BOUNDS has 599 observations and 11 variables.
+NOTE: PROCEDURE UNIVARIATE used (Total process time):
+      real time           4.09 seconds
+      cpu time            4.09 seconds
+
+
+918
+919  * Merge the bounds with the monthly stock data
+920  and winsorize characteristic variables;
+921  data monthly_stock_data4;
+922      merge monthly_stock_data3 bounds;
+923      by date;
+924
+925      array original(5) b_mkt_o size_o size_CPI_o BM_o log_BM_o;
+926      array winsorized(5) b_mkt size size_CPI BM log_BM;
+927      array l_bound(5) b_mkt_0_5 size_0_5 size_CPI_0_5 BM_0_5 log_BM_0_5;
+928      array u_bound(5) b_mkt_99_5 size_99_5 size_CPI_99_5 BM_99_5 log_BM_99_5;
+929
+930      do ii = 1 to 5;
+931          if original(ii)<l_bound(ii) then winsorized(ii) = l_bound(ii);
+932          else if original(ii)>u_bound(ii) then winsorized(ii) = u_bound(ii);
+933          else winsorized(ii) = original(ii);
+934          end;
+935
+936      drop b_mkt_0_5--log_BM_99_5 ii b_mkt_o size_o size_CPI_o BM_o log_BM_o;
+937  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA3.
+NOTE: There were 599 observations read from the data set WORK.BOUNDS.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA4 has 1972533 observations and 14 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.69 seconds
+      cpu time            0.70 seconds
+
+
+938
+939
+940
+941
+942
+943  * SAS 5: Calculate summary statistics;
+944
+945  %let varlist = b_mkt size size_CPI BM log_BM;
+946
+947  ods exclude all; * suppress ods output;
+948  * ods:  ODS stands for output delivery system.
+949  It is mostly used to format the output data of a SAS program
+950  to nice reports which are good to look at and understand.;
+951
+952  * Calculate summary statistics of variables in the "varlist" across stocks in each month,
+953  and stack the results in stats_by_year data set;
+954  proc sort data = monthly_stock_data4; by date permno; run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA4.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA4 has 1972533 observations and 14 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.43 seconds
+      cpu time            1.14 seconds
+
+
+955  proc means data = monthly_stock_data4
+956                      mean std skew kurt min p5 p25 median p75 max n
+957                      stackodsoutput nolabels;
+958      by date;
+959      var &varlist;
+960      ods output summary = stats_by_month;
+961      * proc means results are stored in the ods table called "summary";
+962  run;
+
+NOTE: The data set WORK.STATS_BY_MONTH has 2995 observations and 13 variables.
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA4.
+NOTE: PROCEDURE MEANS used (Total process time):
+      real time           2.66 seconds
+      cpu time            2.65 seconds
+
+
+963
+964  ods exclude none;
+965
+966  * Calculate the time-series-means of the summary statistics for the variables in the
+966! "varlist";
+967  proc sort data = stats_by_month; by variable date; run;
+
+NOTE: There were 2995 observations read from the data set WORK.STATS_BY_MONTH.
+NOTE: The data set WORK.STATS_BY_MONTH has 2995 observations and 13 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+
+
+968  proc means data = stats_by_month mean nolabels noprint;
+969      by variable;
+970      var mean stddev skew kurt min p25 median p75 max n;
+971      output out = stats (drop = _TYPE_ _FREQ_)
+972          mean(mean stddev skew kurt min p25 median p75 max n)
+973              = mean stddev skew kurt min p25 median p75 max n;
+974  run;
+
+NOTE: There were 2995 observations read from the data set WORK.STATS_BY_MONTH.
+NOTE: The data set WORK.STATS has 5 observations and 11 variables.
+NOTE: PROCEDURE MEANS used (Total process time):
+      real time           0.04 seconds
+      cpu time            0.03 seconds
+
+
+975
+976  * Reorder the variables;
+977  data stats;
+978      set stats;
+979      if variable = "b_mkt" then row_num = 1;
+980      else if variable = "size" then row_num = 2;
+981      else if variable = "size_CPI" then row_num = 3;
+982      else if variable = "BM" then row_num = 4;
+983      else if variable = "log_BM" then row_num = 5;
+984  run;
+
+NOTE: There were 5 observations read from the data set WORK.STATS.
+NOTE: The data set WORK.STATS has 5 observations and 12 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.06 seconds
+
+
+985  proc sort data = stats; by row_num; run;
+
+NOTE: There were 5 observations read from the data set WORK.STATS.
+NOTE: The data set WORK.STATS has 5 observations and 12 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+986
+987
+988
+989
+990  * SAS 6: Calculate correlations ***********************************************************;
+991
+992  * Calculate correlations in each month;
+993  proc corr data = monthly_stock_data4 outp = pcorr_by_month (where = (_TYPE_ = "CORR"))
+993! noprint;
+994      by date;
+995      var &varlist;
+996  run;
+
+NOTE: The data set WORK.PCORR_BY_MONTH has 2995 observations and 8 variables.
+NOTE: PROCEDURE CORR used (Total process time):
+      real time           0.54 seconds
+      cpu time            0.54 seconds
+
+
+997
+998  * Calculate the time-series-means of the correlations for variables in the "varlist";
+999  proc sort data = pcorr_by_month; by _name_ date; run;
+
+NOTE: There were 2995 observations read from the data set WORK.PCORR_BY_MONTH.
+NOTE: The data set WORK.PCORR_BY_MONTH has 2995 observations and 8 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+1000  proc means data = pcorr_by_month mean nolabels noprint;
+1001      by _name_;
+1002      var &varlist;
+1003      output out = pcorr (keep = _NAME_ &varlist) mean(&varlist) = &varlist;
+1004  run;
+
+NOTE: There were 2995 observations read from the data set WORK.PCORR_BY_MONTH.
+NOTE: The data set WORK.PCORR has 5 observations and 6 variables.
+NOTE: PROCEDURE MEANS used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
+
+
+1005
+1006  * Reorder the variables;
+1007  data pcorr;
+1008      set pcorr;
+1009      if _NAME_ = "b_mkt" then row_num = 1;
+1010      else if _NAME_ = "size" then row_num = 2;
+1011      else if _NAME_ = "size_CPI" then row_num = 3;
+1012      else if _NAME_ = "BM" then row_num = 4;
+1013      else if _NAME_ = "log_BM" then row_num = 5;
+1014  run;
+
+NOTE: There were 5 observations read from the data set WORK.PCORR.
+NOTE: The data set WORK.PCORR has 5 observations and 7 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.05 seconds
+      cpu time            0.04 seconds
+
+
+1015  proc sort data = pcorr; by row_num; run;
+
+NOTE: There were 5 observations read from the data set WORK.PCORR.
+NOTE: The data set WORK.PCORR has 5 observations and 7 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+1016
+1017
+1018
+1019
+1020  * SAS 7: Dependent-sort stocks into 25 portfolios based on size and BM
+1020! *******************************;
+1021
+1022  * Check if we have many stocks with the same value of size or BM in any month;
+1023  data test1;
+1024      set monthly_stock_data3 (keep = date size_o);
+1025  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA3.
+NOTE: The data set WORK.TEST1 has 1972533 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.25 seconds
+      cpu time            0.25 seconds
+
+
+1026  proc sort data = test1; by date size_o; run;
+
+NOTE: There were 1972533 observations read from the data set WORK.TEST1.
+NOTE: The data set WORK.TEST1 has 1972533 observations and 2 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.35 seconds
+      cpu time            0.92 seconds
+
+
+1027  data test1;
+1028      set test1;
+1029      by date size_o;
+1030
+1031      retain N;
+1032      if first.size_o then N = 1;
+1033      else N = N+1;
+1034
+1035      if last.size_o then output;
+1036  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.TEST1.
+NOTE: The data set WORK.TEST1 has 1965634 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.26 seconds
+      cpu time            0.25 seconds
+
+
+1037  proc sort data = test1; by descending N; run;
+
+NOTE: There were 1965634 observations read from the data set WORK.TEST1.
+NOTE: The data set WORK.TEST1 has 1965634 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.32 seconds
+      cpu time            0.87 seconds
+
+
+1038  data test1;
+1039      set test1;
+1040      if N>1;
+1041  run;
+
+NOTE: There were 1965634 observations read from the data set WORK.TEST1.
+NOTE: The data set WORK.TEST1 has 6849 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.12 seconds
+      cpu time            0.09 seconds
+
+
+1042
+1043  data test2;
+1044      set monthly_stock_data3 (keep = date BM_o);
+1045  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA3.
+NOTE: The data set WORK.TEST2 has 1972533 observations and 2 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.21 seconds
+      cpu time            0.20 seconds
+
+
+1046  proc sort data = test2; by date BM_o; run;
+
+NOTE: There were 1972533 observations read from the data set WORK.TEST2.
+NOTE: The data set WORK.TEST2 has 1972533 observations and 2 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.33 seconds
+      cpu time            0.98 seconds
+
+
+1047  data test2;
+1048      set test2;
+1049      by date BM_o;
+1050
+1051      retain N;
+1052      if first.BM_o then N = 1;
+1053      else N = N+1;
+1054
+1055      if last.BM_o then output;
+1056  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.TEST2.
+NOTE: The data set WORK.TEST2 has 1972500 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.27 seconds
+      cpu time            0.28 seconds
+
+
+1057  proc sort data = test2; by descending N; run;
+
+NOTE: There were 1972500 observations read from the data set WORK.TEST2.
+NOTE: The data set WORK.TEST2 has 1972500 observations and 3 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.31 seconds
+      cpu time            0.82 seconds
+
+
+1058  data test2;
+1059      set test2;
+1060      if N>1;
+1061  run;
+
+NOTE: There were 1972500 observations read from the data set WORK.TEST2.
+NOTE: The data set WORK.TEST2 has 33 observations and 3 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.10 seconds
+
+
+1062
+1063  * Since only up to three stocks have the same size_o value
+1064  * and only up to two stocks have the same BM value in a certain month,
+1065  * we will define the i-th portfolio as the set of stocks with B(i-1)<=X<B(i)
+1066  * instead of B(i-1)<=X<=B(i);
+1067
+1068  * Calculate size breakpoints as 20th, 40th, 60th, and 80th size percentiles
+1069  among NYSE stocks in each month;
+1070  proc univariate data = monthly_stock_data4 (where = (exchcd in (1,31))) noprint;
+1071      by date;
+1072      var size;
+1073      output out = size_breakpoints pctlpts = 20 40 60 80 pctlpre = size_;
+1074  run;
+
+NOTE: The data set WORK.SIZE_BREAKPOINTS has 599 observations and 5 variables.
+NOTE: PROCEDURE UNIVARIATE used (Total process time):
+      real time           0.54 seconds
+      cpu time            0.54 seconds
+
+
+1075
+1076  * Merge the size breakpoints with the monthly stock data
+1077  and define size sorted portfolios;
+1078  data monthly_stock_data5;
+1079      merge monthly_stock_data4 size_breakpoints;
+1080      by date;
+1081
+1082      if size < size_20 then p1 = 1;
+1083      else if size < size_40 then p1 = 2;
+1084      else if size < size_60 then p1 = 3;
+1085      else if size < size_80 then p1 = 4;
+1086      else p1 = 5;
+1087  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA4.
+NOTE: There were 599 observations read from the data set WORK.SIZE_BREAKPOINTS.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA5 has 1972533 observations and 19 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.50 seconds
+      cpu time            0.50 seconds
+
+
+1088
+1089  * Calculate BM breakpoints as 20th, 40th, 60th, and 80th BM percentiles
+1090  * among all stocks in each size sorted portfolio in each month;
+1091  proc sort data = monthly_stock_data5; by date p1; run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA5.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA5 has 1972533 observations and 19 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.63 seconds
+      cpu time            1.70 seconds
+
+
+1092  proc univariate data = monthly_stock_data5 noprint;
+1093      by date p1;
+1094      var BM;
+1095      output out = BM_breakpoints pctlpts = 20 40 60 80 pctlpre = BM_;
+1096  run;
+
+NOTE: The data set WORK.BM_BREAKPOINTS has 2995 observations and 6 variables.
+NOTE: PROCEDURE UNIVARIATE used (Total process time):
+      real time           1.08 seconds
+      cpu time            1.09 seconds
+
+
+1097
+1098  * Merge the BM breakpoints with the monthly stock data
+1099  and define BM sorted portfolios in each size sorted portfolio;
+1100  data monthly_stock_data6;
+1101      merge monthly_stock_data5 BM_breakpoints;
+1102      by date p1;
+1103
+1104      if BM < BM_20 then p2 = 1;
+1105      else if BM < BM_40 then p2 = 2;
+1106      else if BM < BM_60 then p2 = 3;
+1107      else if BM < BM_80 then p2 = 4;
+1108      else p2 = 5;
+1109  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA5.
+NOTE: There were 2995 observations read from the data set WORK.BM_BREAKPOINTS.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA6 has 1972533 observations and 24 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.53 seconds
+      cpu time            0.51 seconds
+
+
+1110
+1111
+1112
+1113  * Save the final data set in a local folder;
+1114  data my_lib.assignment2_data;
+1115      set monthly_stock_data6;
+1116  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA6.
+NOTE: The data set MY_LIB.ASSIGNMENT2_DATA has 1972533 observations and 24 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.43 seconds
+      cpu time            0.42 seconds
+
+
+1117  proc sort data = my_lib.assignment2_data; by date permno; run;
+
+NOTE: There were 1972533 observations read from the data set MY_LIB.ASSIGNMENT2_DATA.
+NOTE: The data set MY_LIB.ASSIGNMENT2_DATA has 1972533 observations and 24 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.67 seconds
+      cpu time            1.59 seconds
+
+
+1118
+1119  * Calculate the time-series average number of stocks in each portfolio;
+1120  proc sort data = monthly_stock_data6; by date p1 p2; run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA6.
+NOTE: The data set WORK.MONTHLY_STOCK_DATA6 has 1972533 observations and 24 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.96 seconds
+      cpu time            1.62 seconds
+
+
+1121  proc means data = monthly_stock_data6 n nolabels noprint;
+1122      by date p1 p2;
+1123      var permno;
+1124      output out = nstocks_per_p n = nstocks;
+1125  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.MONTHLY_STOCK_DATA6.
+NOTE: The data set WORK.NSTOCKS_PER_P has 14975 observations and 6 variables.
+NOTE: PROCEDURE MEANS used (Total process time):
+      real time           0.35 seconds
+      cpu time            0.34 seconds
+
+
+1126  proc sort data = nstocks_per_p; by p1 p2; run;
+
+NOTE: There were 14975 observations read from the data set WORK.NSTOCKS_PER_P.
+NOTE: The data set WORK.NSTOCKS_PER_P has 14975 observations and 6 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.01 seconds
+
+
+1127  proc means data = nstocks_per_p mean nolabels noprint;
+1128      by p1 p2;
+1129      var nstocks;
+1130      output out = nstocks_per_p (drop = _TYPE_) mean = ave_nstocks;
+1131  run;
+
+NOTE: There were 14975 observations read from the data set WORK.NSTOCKS_PER_P.
+NOTE: The data set WORK.NSTOCKS_PER_P has 25 observations and 4 variables.
+NOTE: PROCEDURE MEANS used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.01 seconds
+
+
+1132  proc transpose data = nstocks_per_p out = nstocks_per_p (drop = _NAME_ _LABEL_) prefix = p2_
+1132! ;
+1133      by p1;
+1134      id p2;
+1135      var ave_nstocks;
+1136  run;
+
+NOTE: There were 25 observations read from the data set WORK.NSTOCKS_PER_P.
+NOTE: The data set WORK.NSTOCKS_PER_P has 5 observations and 6 variables.
+NOTE: PROCEDURE TRANSPOSE used (Total process time):
+      real time           0.03 seconds
+      cpu time            0.03 seconds
