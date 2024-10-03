@@ -99,6 +99,7 @@ run;
 * Rename characteristic variables;
 data monthly_stock_data3; 
     set monthly_stock_data3; 
+    ** _o : original data ;
     rename b_mkt = b_mkt_o size = size_o size_CPI = size_CPI_o BM = BM_o log_BM = log_BM_o; 
 run; 
 
