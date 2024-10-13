@@ -1,0 +1,333 @@
+2895  * SAS 3: Calculate the time-series average of value-weighted portfolio returns
+2895! ******************;
+2896
+2897  data portfolio1;
+2898      set My_lib.assignment2_data;
+2899      eretadj_ME = (eretadj*100)*ME_lag1;
+2900  run;
+
+NOTE: There were 1972533 observations read from the data set MY_LIB.ASSIGNMENT2_DATA.
+NOTE: The data set WORK.PORTFOLIO1 has 1972533 observations and 25 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.40 seconds
+      cpu time            0.40 seconds
+
+
+2901  proc sort data = portfolio1;
+2902      by date p1 p2;
+2903  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.PORTFOLIO1.
+NOTE: The data set WORK.PORTFOLIO1 has 1972533 observations and 25 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.72 seconds
+      cpu time            1.54 seconds
+
+
+2904  proc means data = portfolio1 sum noprint;
+2905      by date p1 p2;
+2906      var eretadj_ME ME_lag1;
+2907      output out = portfolio2 (drop = _FREQ_ _TYPE_) sum = / autoname;
+2908  run;
+
+NOTE: There were 1972533 observations read from the data set WORK.PORTFOLIO1.
+NOTE: The data set WORK.PORTFOLIO2 has 14975 observations and 5 variables.
+NOTE: PROCEDURE MEANS used (Total process time):
+      real time           0.44 seconds
+      cpu time            0.43 seconds
+
+
+2909  data portfolio2;
+2910      set portfolio2;
+2911      vw_pret = eretadj_ME_Sum/ME_lag1_Sum;
+2912      keep date p1 p2 vw_pret;
+2913  run;
+
+NOTE: There were 14975 observations read from the data set WORK.PORTFOLIO2.
+NOTE: The data set WORK.PORTFOLIO2 has 14975 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+2914
+2915  * Calculate the return difference
+2916  between the fifth (p2 = 5) and first (p2 = 1) BM sorted portfolios
+2917  within each Size sorted portfolio;
+2918  data portfolio3;
+2919      set portfolio2(where = (p2 in (1,5)));
+2920  run;
+
+NOTE: There were 5990 observations read from the data set WORK.PORTFOLIO2.
+      WHERE p2 in (1, 5);
+NOTE: The data set WORK.PORTFOLIO3 has 5990 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+2921  proc sort data = portfolio3;
+2922      by date p1 p2;
+2923  run;
+
+NOTE: There were 5990 observations read from the data set WORK.PORTFOLIO3.
+NOTE: The data set WORK.PORTFOLIO3 has 5990 observations and 4 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+
+
+2924  proc transpose data = portfolio3 out = portfolio4;
+2925      by date p1;
+2926      id p2;
+2927      var vw_pret;
+2928  run;
+
+NOTE: There were 5990 observations read from the data set WORK.PORTFOLIO3.
+NOTE: The data set WORK.PORTFOLIO4 has 2995 observations and 5 variables.
+NOTE: PROCEDURE TRANSPOSE used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+2929  data portfolio4;
+2930      set portfolio4;
+2931      p2 = 51;
+2932      vw_pret = _5 - _1;
+2933      keep date p1 p2 vw_pret;
+2934  run;
+
+NOTE: There were 2995 observations read from the data set WORK.PORTFOLIO4.
+NOTE: The data set WORK.PORTFOLIO4 has 2995 observations and 4 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+
+
+2935
+2936  * Append the two datasets;
+2937  data portfolio5;
+2938      set portfolio2 portfolio4;
+2939      year = year(date);
+2940      month = month(date);
+2941  run;
+
+NOTE: There were 14975 observations read from the data set WORK.PORTFOLIO2.
+NOTE: There were 2995 observations read from the data set WORK.PORTFOLIO4.
+NOTE: The data set WORK.PORTFOLIO5 has 17970 observations and 6 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+2942  proc sort data = portfolio5;
+2943      by year month date p1 p2;
+2944  run;
+
+NOTE: There were 17970 observations read from the data set WORK.PORTFOLIO5.
+NOTE: The data set WORK.PORTFOLIO5 has 17970 observations and 6 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+
+
+2945
+2946
+2947
+2948
+2949
+2950  * SAS4: Add FF-3 factors to the portfolio return data set **********************************
+2950! ;
+2951
+2952  * Load monthly factors data;
+2953  proc import out = factors
+2954      datafile = "&my_directory\factors_monthly.csv"
+2955      dbms = csv replace;
+2956  run;
+
+2957   /**********************************************************************
+2958   *   PRODUCT:   SAS
+2959   *   VERSION:   9.4
+2960   *   CREATOR:   External File Interface
+2961   *   DATE:      09NOV21
+2962   *   DESC:      Generated SAS Datastep Code
+2963   *   TEMPLATE SOURCE:  (None Specified.)
+2964   ***********************************************************************/
+2965      data WORK.FACTORS    ;
+2966      %let _EFIERR_ = 0; /* set the ERROR detection macro variable */
+2967      infile 'D:\Dropbox\Lecture notes\Estimation of Asset Pricing Models\2021
+2967! Fall\SAS\factors_monthly.csv' delimiter = ',' MISSOVER DSD lrecl=32767 firstobs=2 ;
+2968         informat date best32. ;
+2969         informat mktrf best32. ;
+2970         informat smb best32. ;
+2971         informat hml best32. ;
+2972         informat rf best32. ;
+2973         informat year best32. ;
+2974         informat month best32. ;
+2975         informat umd best32. ;
+2976         informat dateff best32. ;
+2977         format date best12. ;
+2978         format mktrf best12. ;
+2979         format smb best12. ;
+2980         format hml best12. ;
+2981         format rf best12. ;
+2982         format year best12. ;
+2983         format month best12. ;
+2984         format umd best12. ;
+2985         format dateff best12. ;
+2986      input
+2987                  date
+2988                  mktrf
+2989                  smb
+2990                  hml
+2991                  rf
+2992                  year
+2993                  month
+2994                  umd
+2995                  dateff
+2996      ;
+2997      if _ERROR_ then call symputx('_EFIERR_',1);  /* set ERROR detection macro variable */
+2998      run;
+
+NOTE: The infile 'D:\Dropbox\Lecture notes\Estimation of Asset Pricing Models\2021
+      Fall\SAS\factors_monthly.csv' is:
+
+      Filename=D:\Dropbox\Lecture notes\Estimation of Asset Pricing Models\2021
+      Fall\SAS\factors_monthly.csv,
+      RECFM=V,LRECL=32767,File Size (bytes)=81479,
+      Last Modified=25Nov2020:11:18:20,
+      Create Time=30Jul2021:16:32:45
+
+NOTE: 1132 records were read from the infile 'D:\Dropbox\Lecture notes\Estimation of Asset
+      Pricing Models\2021 Fall\SAS\factors_monthly.csv'.
+      The minimum record length was 61.
+      The maximum record length was 73.
+NOTE: The data set WORK.FACTORS has 1132 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+
+
+1132 rows created in WORK.FACTORS from D:\Dropbox\Lecture notes\Estimation of Asset Pricing
+Models\2021 Fall\SAS\factors_monthly.csv.
+
+
+
+NOTE: WORK.FACTORS data set was successfully created.
+NOTE: The data set WORK.FACTORS has 1132 observations and 9 variables.
+NOTE: PROCEDURE IMPORT used (Total process time):
+      real time           0.10 seconds
+      cpu time            0.07 seconds
+
+
+2999
+3000  * Be careful. The "date" column in the montly factor data set is NOT in a date format.
+3001  We will merge the factor data set with the portfolio return data set
+3002  using "year" and "month" variables as the key variables;
+3003  data factors;
+3004      set factors;
+3005
+3006      * convert factors from decimal to percent;
+3007      mktrf = mktrf*100;
+3008      smb = smb*100;
+3009      hml = hml*100;
+3010      keep year month mktrf smb hml;
+3011  run;
+
+NOTE: There were 1132 observations read from the data set WORK.FACTORS.
+NOTE: The data set WORK.FACTORS has 1132 observations and 5 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+
+
+3012
+3013  * Merge;
+3014  data portfolio6;
+3015      merge portfolio5 (in = a) factors (in = b);
+3016      by year month;
+3017      if a;
+3018  run;
+
+NOTE: There were 17970 observations read from the data set WORK.PORTFOLIO5.
+NOTE: There were 1132 observations read from the data set WORK.FACTORS.
+NOTE: The data set WORK.PORTFOLIO6 has 17970 observations and 9 variables.
+NOTE: DATA statement used (Total process time):
+      real time           0.02 seconds
+      cpu time            0.03 seconds
+
+
+3019
+3020
+3021
+3022
+3023  * SAS 5: Test if the BM5 portfolio has a higher expected return than BM1 portfolio
+3024  within each size group using time-series regressions **********************************;
+3025
+3026  proc sort data = portfolio6;
+3027      by p1 p2 date;
+3028  run;
+
+NOTE: There were 17970 observations read from the data set WORK.PORTFOLIO6.
+NOTE: The data set WORK.PORTFOLIO6 has 17970 observations and 9 variables.
+NOTE: PROCEDURE SORT used (Total process time):
+      real time           0.01 seconds
+      cpu time            0.01 seconds
+
+
+3029
+3030  * To perform Newey-West standard error correction,
+3031  PROC MODEL is run specifying the GMM estimation method in the FIT statement.
+3032  KERNEL=(BART, L+1, 0) is also specified which requests the Bartlett kernel with a lag length
+3032!  of L.
+3033  The VARDEF(specify the denominator for computing variances and covariances)=n option
+3034  is specified to be consistent with the original Newey-West formula;
+
+3054  * Calculate the FF3 alpha of the long-short portfolio (p2=51);
+3055  proc model data = portfolio6 (where = (p2 = 51));
+3056      by p1;
+3057      exog mktrf hml smb;
+3058      instruments _exog_;
+3059      vw_pret = a + b1*mktrf + b2*hml + b3*smb;
+
+3060      fit vw_pret / gmm kernel = (bart, 7, 0) vardef = n;
+3061      ods output parameterestimates = table3;
+3062      quit;
+
+NOTE: At 2SLS Iteration 1 convergence assumed because OBJECTIVE=2.091952E-29 is almost zero (<
+      1E-12).
+NOTE: At GMM Iteration 0 convergence assumed because OBJECTIVE=1.315911E-30 is almost zero
+      (<1E-12).
+NOTE: The above message was for the following BY group:
+      p1=1
+NOTE: At 2SLS Iteration 1 convergence assumed because OBJECTIVE=4.329764E-30 is almost zero (<
+      1E-12).
+NOTE: At GMM Iteration 0 convergence assumed because OBJECTIVE=4.978646E-31 is almost zero
+      (<1E-12).
+NOTE: The above message was for the following BY group:
+      p1=2
+NOTE: At 2SLS Iteration 1 convergence assumed because OBJECTIVE=1.959028E-30 is almost zero (<
+      1E-12).
+NOTE: At GMM Iteration 0 convergence assumed because OBJECTIVE=9.691733E-32 is almost zero
+      (<1E-12).
+NOTE: The above message was for the following BY group:
+      p1=3
+NOTE: At 2SLS Iteration 1 convergence assumed because OBJECTIVE=2.387776E-29 is almost zero (<
+      1E-12).
+NOTE: At GMM Iteration 0 convergence assumed because OBJECTIVE=1.252502E-30 is almost zero
+      (<1E-12).
+NOTE: The above message was for the following BY group:
+      p1=4
+NOTE: At 2SLS Iteration 1 convergence assumed because OBJECTIVE=2.828047E-30 is almost zero (<
+      1E-12).
+NOTE: At GMM Iteration 0 convergence assumed because OBJECTIVE=2.243215E-31 is almost zero
+      (<1E-12).
+NOTE: The above message was for the following BY group:
+      p1=5
+NOTE: The data set WORK.TABLE3 has 20 observations and 8 variables.
+NOTE: PROCEDURE MODEL used (Total process time):
+      real time           0.16 seconds
+      cpu time            0.15 seconds
+
+
+3063  ods exclude none;
