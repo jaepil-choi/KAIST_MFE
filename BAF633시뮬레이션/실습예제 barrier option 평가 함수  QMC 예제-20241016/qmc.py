@@ -56,7 +56,8 @@ prcs.plot()
 #barrier option
 s,k,r,q,t,sigma = 100, 100, 0.03, 0, 1, 0.2
 b, rebate = 130, 0
-m = 5
+# m = 5
+m = 1 # 한 번만 체크. 만기에서만 보는 것. 이러면 bias가 엄청 커짐. 당연히 m이 하나니까... 
 option_flag = 'call'
 barrier_flag = 'up-out'
 #Analytic Formula
@@ -71,3 +72,14 @@ for n in range(5,20):
 
 prcs.plot()
 
+
+# %%
+
+## QMC가 잘 먹히려면? 
+# 만기(terminal) 시점의 주가 분포가 균질해야. 
+# qmc를 쓸 때 먼저 주가를 균질하게 만들고 
+# brownian bridge를 쓰고 qmc 해주면 매우 효과적. 
+# stratified sampling 할 때도 효과가 좋은 계층의 샘플링을 많이 하는 원리
+# 그것도 qmc도 terminal에서의 주가분포가 균질한 것이 중요. 
+
+# 솔직히 다 이해하진 못했다. 
