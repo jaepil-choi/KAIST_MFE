@@ -35,7 +35,18 @@ def exfdm_worst_of(s1, s2, k, r, q1, q2, t, sigma1, sigma2, corr, nx, ny, nt, oh
         d1[1:-1,1:-1], u1[1:-1,1:-1], d2[1:-1,1:-1], u2[1:-1,1:-1], c[1:-1,1:-1], m[1:-1,1:-1]
     # coefficient를 안쪽만 쓴다. d1, u2 등등은 다 matrix. 
     
-    #time backwardation
+    
+    # 아래의 backwardation에 대한 설명들
+    # backwardation 시의 변화를 3d plot을 볼 수도 있다. 이것도 올려주셨을듯? exfdm_worst_of 에 코드 추가하신듯. 
+    
+    # 1. terminal 시점에서의 payoff를 보면 그냥 디지털마냥 절벽처럼 나온다. 두 지수 모두 행사가 이상이여야 payoff가 발생하는 그림. 
+    # 그림으로 찍어서 이런 식으로 나와야 제대로 하고 있는 것. 절벽처럼 보이지만 기울기가 있다. 
+    # oh 파라미터를 0.1 주면 잘 안보이지만 0.5만 줘도 수직이 아니고 기울기라는 것이 보인다. 
+    # 현재 시점으로 backwardation 해 오는 과정에서 기울기가 점점 줄어든다. 마지막 시점 = 현재로 오면 상당히 곡선이 됨. 
+
+    # 2. 
+
+    #time backwardation 
     for j in range(nt-1,-1,-1):
         temp = d1 * v[1:-1,:-2] + \
             d2 * v[:-2,1:-1] + \
