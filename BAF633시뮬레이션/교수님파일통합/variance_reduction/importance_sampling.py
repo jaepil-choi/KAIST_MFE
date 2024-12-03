@@ -16,7 +16,7 @@ def mcprice_importance_sampling(s,k,r,q,t,sigma,nsim,flag):
 
     #importance sampling
     mu = (np.log(k/s) - (r-q-0.5*sigma**2)*t) / (sigma*np.sqrt(t)) # g는 다 다를 수 있는데, 교수님은 여기서 g를 표준정규분포에서 mu만큼만 옮긴걸로. 
-    # 행사가 근처가 우리가 가장 필요한 구간이다. S_T ~= K가 되도록 S_0 을 K까지 shift시켜줄 수 있는 mu를 찾아. 
+    # 행사가 근처가 우리가 가장 필요한 구간이다. S_T와 K가 비슷하게 되도록 S_0 을 K까지 shift시켜줄 수 있는 mu를 찾아. 
     # deep OTM인 경우도, 분포를 strike price 근처로 옮겨주는 것이 중요하다.
     # 위의 mu 값이 바로, shift했을 때 K로 만들어주는 mu 값이다.
 
