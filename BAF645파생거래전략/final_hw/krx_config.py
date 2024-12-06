@@ -1,9 +1,9 @@
 # Constants
 API_URL = "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ",
-                #   "AppleWebKit/537.36 (KHTML, like Gecko) "
-                #   "Chrome/131.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/131.0.0.0 Safari/537.36",
     "Accept": "*/*",
     "Accept-Language": "en-US,en;q=0.9,ko-KR;q=0.8,ko;q=0.7",
     "Content-Type": "application/x-www-form-urlencoded",
