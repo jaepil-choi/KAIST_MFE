@@ -2891,12 +2891,12 @@ tests = ["pytest"]
 
 [[package]]
 name = "pykrx"
-version = "1.0.45"
+version = "1.0.48"
 description = "KRX data scraping"
 optional = false
 python-versions = ">=3"
 files = [
-    {file = "pykrx-1.0.45-py3-none-any.whl", hash = "sha256:100bda464a81982f03c3f77da02225d1fc203eca8f83b0a05a2f573d9cfa892f"},
+    {file = "pykrx-1.0.48-py3-none-any.whl", hash = "sha256:c2bb4edda5a316a6a8a56d85ace87b61d88478edcfd5ebd8c0b401974b9f1a40"},
 ]
 
 [package.dependencies]
