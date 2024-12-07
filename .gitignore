@@ -199,9 +199,20 @@ BAF663자계추/Assignment 2/assignment2_sample_data.csv
 BAF663자계추/Assignment 2/assignment1_data.csv
 BAF663자계추/Assignment 3/assignment2_data.csv
 
+BAF645파생거래전략/**/*.csv
+BAF645파생거래전략/**/*.pkl
 
 # Ignore parquets
 *.parquet
 
 # Ignore h5 files
 *.h5
+
+## Ignore sandbox
+sandbox.ipynb
+sandbox.py
+
+## ignore compressed
+*.zip
+*.tar.gz
+*.7z
