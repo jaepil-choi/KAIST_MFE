@@ -64,3 +64,43 @@ PAYLOAD_TEMPLATE2 = {
     "money": 3,
     "csvxls_isNo": False,
 }
+
+ROOM = 10
+
+# Define schema: column_name: (dtype, max_length)
+H5_SCHEMA = {
+    'ISU_CD': ('object', ROOM + 12),          # Base length 12 + ROOM=10 => 22
+    'ISU_SRT_CD': ('object', ROOM + 8),      # Base length 8 + ROOM=10 => 18
+    'ISU_NM': ('object', ROOM + 26),         # Base length 26 + ROOM=10 => 36
+    'TDD_CLSPRC': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'FLUC_TP_CD': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'CMPPREVDD_PRC': ('object', ROOM + 1),   # Base length 1 + ROOM=10 => 11
+    'TDD_OPNPRC': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'TDD_HGPRC': ('object', ROOM + 1),       # Base length 1 + ROOM=10 => 11
+    'TDD_LWPRC': ('object', ROOM + 1),       # Base length 1 + ROOM=10 => 11
+    'IMP_VOLT': ('object', ROOM + 5),        # Base length 5 + ROOM=10 => 15
+    'NXTDD_BAS_PRC': ('object', ROOM + 10),  # Base length 10 + ROOM=10 => 20
+    'ACC_TRDVOL': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'ACC_TRDVAL': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'ACC_OPNINT_QTY': ('object', ROOM + 1),  # Base length 1 + ROOM=10 => 11
+    'SECUGRP_ID': ('object', ROOM + 2)       # Base length 2 + ROOM=10 => 12
+}
+
+
+H5_SCHEMA = {
+    'ISU_CD': ('object', ROOM + 12),          # Base length 12 + ROOM=10 => 22
+    'ISU_SRT_CD': ('object', ROOM + 8),      # Base length 8 + ROOM=10 => 18
+    'ISU_NM': ('object', ROOM + 26),         # Base length 26 + ROOM=10 => 36
+    'TDD_CLSPRC': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'FLUC_TP_CD': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'CMPPREVDD_PRC': ('object', ROOM + 1),   # Base length 1 + ROOM=10 => 11
+    'TDD_OPNPRC': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'TDD_HGPRC': ('object', ROOM + 1),       # Base length 1 + ROOM=10 => 11
+    'TDD_LWPRC': ('object', ROOM + 1),       # Base length 1 + ROOM=10 => 11
+    'IMP_VOLT': ('object', ROOM + 5),        # Base length 5 + ROOM=10 => 15
+    'NXTDD_BAS_PRC': ('object', ROOM + 10),  # Base length 10 + ROOM=10 => 20
+    'ACC_TRDVOL': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'ACC_TRDVAL': ('object', ROOM + 1),      # Base length 1 + ROOM=10 => 11
+    'ACC_OPNINT_QTY': ('object', ROOM + 1),  # Base length 1 + ROOM=10 => 11
+    'SECUGRP_ID': ('object', ROOM + 2)       # Base length 2 + ROOM=10 => 12
+}
