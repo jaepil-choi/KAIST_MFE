@@ -35,6 +35,7 @@ pykalman = "^0.9.7"
 pmdarima = "^2.0.4"
 tables = "^3.10.1"
 h5py = "^3.12.1"
+finance-datareader = "^0.9.94"
 
 
 [build-system]
