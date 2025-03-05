@@ -216,3 +216,6 @@ sandbox.py
 *.zip
 *.tar.gz
 *.7z
+
+## Ignore 안현's code
+*/안현/*
