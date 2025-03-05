@@ -152,6 +152,11 @@ plt.legend()
 # [22]
 from sklearn.ensemble import IsolationForest
 clf2 = IsolationForest(contamination=0.1)
+# contamination: 이상치 비율
+# n_estimators: 트리 개수 (default = 100)
+# max_features: 각 트리에서 사용할 최대 feature 개수 (default = 1)
+# max_samples: 각 트리에서 사용할 최대 sample 개수 (default = 'auto' --> min(256, n_samples) )
+
 clf2.fit(X)
 y_pred2 = clf2.predict(X)  # 1: inlier, -1: outlier
 outlier_mask2 = y_pred2 == -1
