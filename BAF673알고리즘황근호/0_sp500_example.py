@@ -24,6 +24,8 @@ d0 = datetime.datetime(2015, 1, 1)
 d1 = datetime.datetime(2024, 12, 31)
 d0_list = sp500_list[(sp500_list['start']<=d0) & (sp500_list['ending']>=d0)]['permno']
 d1_list = sp500_list[(sp500_list['start']<=d1) & (sp500_list['ending']>=d1)]['permno']
+## --> survivorship bias를 조심해야 함을 알 수 있음. 
+
 
 sp500_prices = sp500_prices.loc[:,pd.concat([d0_list, d1_list]).drop_duplicates()]
 
@@ -86,7 +88,7 @@ values = pd.concat([pf0.value(), pf1.value()], axis=1)
 values.columns = ['Portfolio 0', 'Portfolio 1']
 values.plot(ax=ax)
 
-
+## 선견편향의 효과를 보여준다. survivorship bias 로 인한 차이. 
 
 
 

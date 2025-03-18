@@ -10,7 +10,7 @@ sp500 = pd.read_csv("./data/sp500_return.csv", parse_dates=['date'], index_col=0
 sp500_list = pd.read_csv("./data/sp500_list.csv", index_col=0, parse_dates=['start','ending'])
 stock_id = pd.read_csv("./data/stock_id.csv", index_col=0, parse_dates=['namedt','nameendt'])
 
-sp500 = sp500.loc["1969-01-01":]
+sp500 = sp500.loc["1969-01-01":] # 1년을 pair formation 기간으로 쓰기 때문에, 1970년부터 보기 위해 69년부터 데이터 잡음. 
 sp500.columns = sp500.columns.astype(int)
 orders = pd.DataFrame(index=sp500.index, columns=sp500.columns, data=0, dtype=float)
 sp500_prices = (1+sp500).cumprod()
