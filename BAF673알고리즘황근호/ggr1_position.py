@@ -1,3 +1,5 @@
+## 포지션 생성하는 로직을 가진 코드드
+
 #%%
 import pandas as pd 
 import numpy as np 
@@ -80,6 +82,8 @@ for d in ds:
         norm_price1, norm_price2 = norm_test_prices[no1].loc[test_prices12.index], norm_test_prices[no2].loc[test_prices12.index]
         diff = norm_price1 - norm_price2
 
+
+        #### 포지션 만드는 방법 (저번시간에도 했음음)
         position = pd.DataFrame(index=diff.index, columns=[no1, no2], dtype=float)
         std2 = 2*stdev
         position[diff >= std2] = [-1.0, 1.0]
@@ -95,8 +99,16 @@ for d in ds:
         exit = (position[no1]==0.0) & (position[no1].shift(1)!=0.0) & (position[no1].shift(1).notnull())
         order = position.diff()
         order.iloc[0] = position.iloc[0]
-        order[entry] = order[entry] / test_prices12[entry]
-        order[exit] = (-1) * order[entry].values
+
+        ## vectorbt에 전략을 넣는 3가지 방법:
+        # 1. 금액의 %를 rebalancing하는 형태로
+        # 2. 사고파는 주식의 금액을 기준으로
+        # 3. 주식의 수량을 기준으로
+
+        ## 여기선 3번째 방법을 사용
+
+        order[entry] = order[entry] / test_prices12[entry] # 가격으로 나눈만큼 주문을 넣는다.
+        order[exit] = (-1) * order[entry].values # exit 할 땐 0으로 돌아갈 수 있도록.
         orders.loc[order.index, position.columns] += order
 
         #하루 딜레이 주문 데이터 생성
@@ -118,10 +130,16 @@ for d in ds:
 
 
 #%%
+## 참고. 대부분이 0/null인 sparse 한 dataset의 경우 SparseDtype을 사용하면 메모리를 효율적으로 사용할 수 있다.
 orders = orders.astype(pd.SparseDtype("float", fill_value=0))
 orders_delay = orders_delay.astype(pd.SparseDtype("float", fill_value=0))
 orders.to_pickle("./data/orders_top30.pkl")
 orders_delay.to_pickle("./data/orders_delay_top30.pkl")
 
+#%%
 
+# 내 질문. pair trading은 기본적으로 long short 아닌가? 
+# market neutral 될거 같은데 왜 pnl은 market exposure가 큰 것 처럼 보이는가? 
+# 한 번 S&P500과의 correlation을 봐야할 것 같다.
 
+# %%
