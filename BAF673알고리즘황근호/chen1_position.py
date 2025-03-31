@@ -31,6 +31,7 @@ for d in ds:
     permno_list = d_list.astype(str).to_list()
     data = sp500[permno_list].loc[d-relativedelta(years=5):d-relativedelta(days=1)]
     ret = data.resample("ME").agg(lambda x: (1+x).prod()-1)
+    # 일간 데이터를 월간으로 바꿔준다. 매일의 수익률을 월간 수익률 화. 
     corr = ret.corr()
     diff_series = pd.Series(index=corr.columns, dtype=float)
     for i in range(len(corr.columns)):
