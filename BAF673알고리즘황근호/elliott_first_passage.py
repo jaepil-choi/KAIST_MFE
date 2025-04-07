@@ -9,6 +9,9 @@ import seaborn as sns
 #t_hat = 0.5*np.log(1+0.5*(np.sqrt((c**2-3)**2+4*c**2)+c**2-3))
 #c = (x0-mu)/sigma*np.sqrt(rho*2)
 def first_passage(x0, mu, sigma, rho):
+    # First Passage Time (FPT)
+    # 처음에 장기평균수준이 아닌 곳에서 출발했다가 언젠가 도달할 장기평균수준에 처음 도달한 시간
+    
     c = (x0-mu)/sigma*np.sqrt(rho*2)
     t_hat = 0.5*np.log(1+0.5*(np.sqrt((c**2-3)**2+4*c**2)+c**2-3))
     max_first_passage_time = t_hat/rho
