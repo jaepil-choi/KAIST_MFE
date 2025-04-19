@@ -36,6 +36,8 @@ pmdarima = "^2.0.4"
 tables = "^3.10.1"
 h5py = "^3.12.1"
 finance-datareader = "^0.9.94"
+jupytext = "^1.17.0"
+nbstripout = "^0.8.1"
 
 
 [build-system]
