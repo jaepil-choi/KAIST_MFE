@@ -1,0 +1,13 @@
+{
+    "emeraldwalk.runonsave": {
+      "messages": "[ERROR] Run on save - Run jupytext sync failed",
+      "commands": [
+        {
+          "match": "\\.(py|ipynb)$",
+          "notMatch": "\\.venv\\\\.*",
+          "cmd": "poetry run jupytext --sync ${file}",
+          "autoShowOutputPanel": "error"
+        }
+      ]
+    }
+  }
