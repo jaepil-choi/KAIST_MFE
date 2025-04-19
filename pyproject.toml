@@ -38,6 +38,9 @@ h5py = "^3.12.1"
 finance-datareader = "^0.9.94"
 jupytext = "^1.17.0"
 nbstripout = "^0.8.1"
+boruta = "^0.4.3"
+xgboost = "^3.0.0"
+imbalanced-learn = "^0.13.0"
 
 
 [build-system]
