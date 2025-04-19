@@ -6,6 +6,10 @@
 #       format_name: percent
 #       format_version: '1.3'
 #       jupytext_version: 1.17.0
+#   kernelspec:
+#     display_name: .venv
+#     language: python
+#     name: python3
 # ---
 
 # %% [markdown]
@@ -414,3 +418,5 @@ plt.title('Precision-Recall Curve')
 plt.grid(True)
 plt.legend()
 plt.show()
+
+# %%
