@@ -211,6 +211,8 @@ BAF645파생거래전략/**/*.pkl
 ## Ignore sandbox
 sandbox.ipynb
 sandbox.py
+sandbox.md
+sandbox/**/*
 
 ## ignore compressed
 *.zip
