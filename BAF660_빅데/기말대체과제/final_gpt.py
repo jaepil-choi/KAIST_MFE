@@ -4,6 +4,9 @@
 # %% [markdown]
 # ## 1. `prob1_bank.csv`
 
+# %% [markdown]
+# ### 0. 라이브러리 임포트 및 데이터 로드
+
 # %%
 import pandas as pd
 import numpy as np
@@ -27,27 +30,23 @@ bank_data = pd.read_csv('prob1_bank.csv')
 print("Bank Dataset Shape:", bank_data.shape)
 print("\nBank Dataset Info:")
 print(bank_data.info())
-print("\nBank Dataset Summary Statistics:")
-print(bank_data.describe())
+# print("\nBank Dataset Summary Statistics:") # EDA에서 상세히 다룸
+# print(bank_data.describe())
 
-# Check for missing values
-print("\nMissing values in each column:")
-print(bank_data.isnull().sum())
+# Check for missing values (EDA에서 확인 완료)
+# print("\nMissing values in each column:")
+# print(bank_data.isnull().sum())
 
-# Check target variable distribution (class imbalance)
-print("\nTarget variable distribution:")
+# Check target variable distribution (class imbalance) - EDA에서 확인 완료 및 시각화
+print("\nTarget variable distribution (Initial Check):")
 print(bank_data['y'].value_counts())
-print(bank_data['y'].value_counts(normalize=True) * 100)
-
-# Visualize target distribution
-plt.figure(figsize=(8, 6))
-sns.countplot(x='y', data=bank_data)
-plt.title('Target Variable Distribution')
-plt.savefig(os.path.join(plots_dir, 'target_distribution.png'))
-plt.close()
+# print(bank_data['y'].value_counts(normalize=True) * 100)
 
 # %% [markdown]
 # ### 1. 범주형 변수 전처리
+#
+# - EDA 결과, 범주형 변수 간 특별한 순서나 계층 구조가 보이지 않으므로 One-Hot Encoding을 적용합니다.
+# - 첫 번째 범주를 제거(`drop='first'`)하여 다중공선성을 방지합니다.
 
 # %%
 # Identify categorical and numerical columns
@@ -57,121 +56,101 @@ numerical_cols = bank_data.select_dtypes(include=['int64', 'float64']).columns.t
 print("Categorical variables:", categorical_cols)
 print("Numerical variables:", numerical_cols)
 
-# Analyze categorical variables
-for col in categorical_cols:
-    print(f"\nUnique values in {col}:")
-    print(bank_data[col].value_counts())
-    
-    # Visualize distribution
-    plt.figure(figsize=(10, 6))
-    bank_data[col].value_counts().plot(kind='bar')
-    plt.title(f'Distribution of {col}')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.savefig(os.path.join(plots_dir, f'distribution_{col}.png'))
-    plt.close()
-
 # Preprocessing categorical variables using OneHotEncoder
+# 목표 변수 'y'는 나중에 LabelEncoding으로 처리하므로 제외
+categorical_features_to_encode = [col for col in categorical_cols if col != 'y']
 categorical_preprocessor = OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
 
 # Apply one-hot encoding
-X_categorical = bank_data[categorical_cols[:-1]]  # Exclude target variable 'y'
+X_categorical = bank_data[categorical_features_to_encode]
 categorical_preprocessor.fit(X_categorical)
 X_categorical_encoded = categorical_preprocessor.transform(X_categorical)
 
 # Create DataFrame with encoded features
-encoded_feature_names = []
-for i, cat_col in enumerate(categorical_cols[:-1]):
-    categories = categorical_preprocessor.categories_[i][1:]  # Skip the first category (dropped)
-    encoded_feature_names.extend([f"{cat_col}_{cat}" for cat in categories])
-
-X_categorical_df = pd.DataFrame(X_categorical_encoded, columns=encoded_feature_names)
+encoded_feature_names = categorical_preprocessor.get_feature_names_out(categorical_features_to_encode)
+X_categorical_df = pd.DataFrame(X_categorical_encoded, columns=encoded_feature_names, index=bank_data.index)
 
 print("\nShape of encoded categorical features:", X_categorical_df.shape)
-print(X_categorical_df.head())
+# print(X_categorical_df.head())
 
 # %% [markdown]
 # ### 2. 수치형 변수 전처리
+#
+# - EDA 결과, `balance` 변수 등에서 상당한 왜도와 이상치가 관찰되었습니다.
+# - 모델 성능에 이상치의 영향을 줄이기 위해 IQR 방법을 사용하여 이상치를 탐지하고 클리핑(Clipping)합니다.
+# - 클리핑 후, `StandardScaler`를 사용하여 모든 수치형 변수를 표준화합니다.
 
 # %%
-# Analyze numerical variables
-for col in numerical_cols:
-    # Summary statistics
-    print(f"\nSummary statistics for {col}:")
-    print(bank_data[col].describe())
-    
-    # Check for outliers with box plot
-    plt.figure(figsize=(8, 6))
-    sns.boxplot(y=bank_data[col])
-    plt.title(f'Boxplot of {col}')
-    plt.savefig(os.path.join(plots_dir, f'boxplot_{col}.png'))
-    plt.close()
-    
-    # Distribution
-    plt.figure(figsize=(8, 6))
-    sns.histplot(bank_data[col], kde=True)
-    plt.title(f'Distribution of {col}')
-    plt.savefig(os.path.join(plots_dir, f'hist_{col}.png'))
-    plt.close()
+# 이상치 처리 함수 (IQR 기반 Clipping)
+def clip_outliers_iqr(series):
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return series.clip(lower_bound, upper_bound)
 
-# Apply standardization to numerical features
+# 수치형 변수에 이상치 처리 적용
+X_numerical = bank_data[numerical_cols].copy()
+for col in numerical_cols:
+    original_skew = X_numerical[col].skew()
+    X_numerical[col] = clip_outliers_iqr(X_numerical[col])
+    clipped_skew = X_numerical[col].skew()
+    print(f"Variable '{col}': Skewness before clipping: {original_skew:.2f}, Skewness after clipping: {clipped_skew:.2f}")
+
+# Apply standardization to numerical features (after clipping)
 scaler = StandardScaler()
-X_numerical = bank_data[numerical_cols]
 X_numerical_scaled = scaler.fit_transform(X_numerical)
 
 # Create DataFrame with scaled features
-X_numerical_df = pd.DataFrame(X_numerical_scaled, columns=numerical_cols)
+X_numerical_df = pd.DataFrame(X_numerical_scaled, columns=numerical_cols, index=bank_data.index)
 
 print("\nShape of scaled numerical features:", X_numerical_df.shape)
-print(X_numerical_df.head())
+# print(X_numerical_df.head())
 
 # %% [markdown]
 # ### 3. 클래스 불균형 처리
+#
+# - EDA 결과, 목표 변수 'y'가 약 88%의 'no'와 12%의 'yes'로 심각한 불균형을 보입니다.
+# - 소수 클래스(yes)의 예측 성능 저하를 방지하기 위해 SMOTE(Synthetic Minority Over-sampling Technique)를 적용하여 오버샘플링합니다.
 
 # %%
 # Combine preprocessed features
 X_preprocessed = pd.concat([X_numerical_df, X_categorical_df], axis=1)
 
-# Convert target variable to binary
+# Convert target variable to binary using LabelEncoder
 label_encoder = LabelEncoder()
 y = label_encoder.fit_transform(bank_data['y'])
+print(f"\nTarget variable mapping: {label_encoder.classes_[0]} -> 0, {label_encoder.classes_[1]} -> 1")
 
-# Check class imbalance
-print("Original class distribution:")
+# Check class imbalance before SMOTE
+print("\nOriginal class distribution:")
 print(Counter(y))
 
 # Apply SMOTE to handle class imbalance
+print("\nApplying SMOTE...")
 smote = SMOTE(random_state=42)
 X_resampled, y_resampled = smote.fit_resample(X_preprocessed, y)
 
-print("Resampled class distribution:")
+print("\nResampled class distribution:")
 print(Counter(y_resampled))
 
-# Visualize class distribution before and after SMOTE
-plt.figure(figsize=(12, 5))
+# Visualize class distribution before and after SMOTE (optional, already done in EDA)
+# plt.figure(figsize=(12, 5))
+# ... (plotting code from final_eda.py or final_gpt.py) ...
+# plt.close()
 
-plt.subplot(1, 2, 1)
-sns.countplot(x=y)
-plt.title('Original Class Distribution')
-plt.xlabel('Class')
-plt.xticks([0, 1], ['No', 'Yes'])
-
-plt.subplot(1, 2, 2)
-sns.countplot(x=y_resampled)
-plt.title('Class Distribution After SMOTE')
-plt.xlabel('Class')
-plt.xticks([0, 1], ['No', 'Yes'])
-
-plt.tight_layout()
-plt.savefig(os.path.join(plots_dir, 'class_balance_comparison.png'))
-plt.close()
-
-print("Final preprocessed dataset shape:", X_resampled.shape)
+print("\nFinal preprocessed dataset shape (after SMOTE):", X_resampled.shape)
+print("Preprocessing for prob1_bank.csv completed.")
 
 # %% [markdown]
 # ## 2. `prob2_card.csv`
 
+# %% [markdown]
+# ### 0. 라이브러리 임포트 및 데이터 로드
+
 # %%
+# Import necessary libraries (some may be re-imported for clarity)
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -180,6 +159,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_score
 from sklearn.manifold import TSNE
+from sklearn.neighbors import NearestNeighbors
+from math import pi
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -187,48 +168,47 @@ warnings.filterwarnings('ignore')
 card_data = pd.read_csv('prob2_card.csv')
 
 # Display basic information
+print("\n--- Credit Card Dataset Analysis ---")
 print("Credit Card Dataset Shape:", card_data.shape)
 print("\nCredit Card Dataset Info:")
 print(card_data.info())
-print("\nCredit Card Dataset Summary Statistics:")
-print(card_data.describe())
+# print("\nCredit Card Dataset Summary Statistics:") # EDA에서 상세히 다룸
+# print(card_data.describe())
 
 # Check for missing values
 print("\nMissing values in each column:")
 print(card_data.isnull().sum())
+# EDA 결과 또는 간단한 확인 결과, 결측치가 없음을 확인.
 
 # Set CUST_ID as index and exclude it from analysis
-card_data.set_index('CUST_ID', inplace=True)
-
-# Visualize distribution of features
-plt.figure(figsize=(15, 10))
-for i, column in enumerate(card_data.columns):
-    plt.subplot(2, 3, i+1)
-    sns.histplot(card_data[column], kde=True)
-    plt.title(f'Distribution of {column}')
-plt.tight_layout()
-plt.savefig(os.path.join(plots_dir, 'card_features_distribution.png'))
-plt.close()
-
-# Correlation heatmap
-plt.figure(figsize=(10, 8))
-sns.heatmap(card_data.corr(), annot=True, cmap='coolwarm', fmt='.2f')
-plt.title('Correlation Heatmap')
-plt.savefig(os.path.join(plots_dir, 'correlation_heatmap.png'))
-plt.close()
-
-# Preprocess data: scaling features
-scaler = StandardScaler()
-card_data_scaled = scaler.fit_transform(card_data)
-card_data_scaled_df = pd.DataFrame(card_data_scaled, columns=card_data.columns, index=card_data.index)
+if 'CUST_ID' in card_data.columns:
+    card_data.set_index('CUST_ID', inplace=True)
 
 # %% [markdown]
-# ### 1. K-Means Clustering
+# ### 1. 데이터 전처리 (스케일링)
+#
+# - 클러스터링 알고리즘은 거리에 기반하므로, 변수들의 스케일을 통일하는 것이 중요합니다.
+# - StandardScaler를 사용하여 모든 특성을 표준화합니다.
 
 # %%
-# Find optimal number of clusters using Elbow Method
+# Preprocess data: scaling features
+print("\nScaling credit card features using StandardScaler...")
+scaler_card = StandardScaler()
+card_data_scaled = scaler_card.fit_transform(card_data)
+card_data_scaled_df = pd.DataFrame(card_data_scaled, columns=card_data.columns, index=card_data.index)
+# print(card_data_scaled_df.head())
+
+# %% [markdown]
+# ### 2. K-Means Clustering
+#
+# - Elbow Method와 Silhouette Score를 사용하여 최적의 클러스터 수(k)를 결정합니다.
+# - 결정된 k로 K-Means 클러스터링을 수행합니다.
+
+# %%
+# Find optimal number of clusters using Elbow Method and Silhouette Score
+print("\nFinding optimal k for K-Means...")
 inertia = []
-silhouette_scores = []
+silhouette_scores_kmeans = []
 k_range = range(2, 11)
 
 for k in k_range:
@@ -237,173 +217,154 @@ for k in k_range:
     inertia.append(kmeans.inertia_)
     
     # Calculate silhouette score
-    labels = kmeans.labels_
-    silhouette_avg = silhouette_score(card_data_scaled, labels)
-    silhouette_scores.append(silhouette_avg)
-    print(f"For n_clusters = {k}, the silhouette score is {silhouette_avg:.3f}")
+    labels_kmeans = kmeans.labels_
+    silhouette_avg_kmeans = silhouette_score(card_data_scaled, labels_kmeans)
+    silhouette_scores_kmeans.append(silhouette_avg_kmeans)
+    # print(f"For n_clusters = {k}, the K-Means silhouette score is {silhouette_avg_kmeans:.3f}")
 
-# Plot Elbow Method
+# Plot Elbow Method and Silhouette Scores
 plt.figure(figsize=(12, 5))
 plt.subplot(1, 2, 1)
 plt.plot(k_range, inertia, 'bo-')
-plt.xlabel('Number of clusters')
+plt.xlabel('Number of clusters (k)')
 plt.ylabel('Inertia')
 plt.title('Elbow Method for Optimal k')
 
 plt.subplot(1, 2, 2)
-plt.plot(k_range, silhouette_scores, 'ro-')
-plt.xlabel('Number of clusters')
+plt.plot(k_range, silhouette_scores_kmeans, 'ro-')
+plt.xlabel('Number of clusters (k)')
 plt.ylabel('Silhouette Score')
 plt.title('Silhouette Score for Optimal k')
 
 plt.tight_layout()
-plt.savefig(os.path.join(plots_dir, 'kmeans_optimal_k.png'))
+# plt.savefig(os.path.join(plots_dir, 'kmeans_optimal_k.png')) # EDA에서 저장됨
+plt.show()
 plt.close()
 
 # Select optimal k based on elbow method and silhouette score
-optimal_k = 4  # This is based on the elbow in the plot and highest silhouette score
+optimal_k = k_range[np.argmax(silhouette_scores_kmeans)] 
+print(f"Selected optimal k for K-Means: {optimal_k} (Silhouette Score: {max(silhouette_scores_kmeans):.3f})")
 
 # Apply K-Means clustering with optimal k
+print(f"\nApplying K-Means with k={optimal_k}...")
 kmeans_optimal = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
 kmeans_labels = kmeans_optimal.fit_predict(card_data_scaled)
 
-# Add cluster labels to the original DataFrame
+# Add cluster labels to the original DataFrame for analysis
 card_data['KMeans_Cluster'] = kmeans_labels
 
-# Visualize cluster distribution
-plt.figure(figsize=(8, 6))
-sns.countplot(x='KMeans_Cluster', data=card_data)
-plt.title('Distribution of K-Means Clusters')
-plt.savefig(os.path.join(plots_dir, 'kmeans_cluster_distribution.png'))
-plt.close()
-
-# Analyze clusters
+# Analyze K-Means clusters
 kmeans_cluster_analysis = card_data.groupby('KMeans_Cluster').mean()
-print("\nK-Means Cluster Analysis:")
+print("\nK-Means Cluster Analysis (Mean Values):")
 print(kmeans_cluster_analysis)
 
-# Visualize cluster profiles
-plt.figure(figsize=(14, 8))
-kmeans_cluster_analysis.T.plot(kind='bar', figsize=(14, 8))
-plt.title('K-Means Cluster Profiles')
-plt.ylabel('Standardized Value')
-plt.xlabel('Features')
-plt.xticks(rotation=45)
-plt.legend(title='Cluster')
-plt.savefig(os.path.join(plots_dir, 'kmeans_cluster_profiles.png'))
-plt.close()
-
 # %% [markdown]
-# ### 2. DBSCAN 클러스터링
+# ### 3. DBSCAN 클러스터링
+#
+# - k-distance plot을 사용하여 적절한 epsilon(eps) 값을 탐색합니다.
+# - 선택된 eps와 min_samples로 DBSCAN 클러스터링을 수행합니다.
 
 # %%
-# Find optimal epsilon using k-distance graph
-from sklearn.neighbors import NearestNeighbors
-
-# Calculate distances to nearest neighbors
-neighbors = NearestNeighbors(n_neighbors=5)
+# Find optimal epsilon using k-distance graph for DBSCAN
+print("\nFinding optimal epsilon for DBSCAN using k-distance graph...")
+# Calculate distances to nearest neighbors (using k=5 based on common practice)
+k_neighbors = 5 * 2 # min_samples * 2 is a common heuristic, or based on feature count
+neighbors = NearestNeighbors(n_neighbors=k_neighbors)
 neighbors_fit = neighbors.fit(card_data_scaled)
 distances, indices = neighbors_fit.kneighbors(card_data_scaled)
 
-# Sort distances in descending order
-distances = np.sort(distances[:, 4], axis=0)  # 5th nearest neighbor
+# Sort distances to the k-th neighbor
+distances_k = np.sort(distances[:, k_neighbors-1], axis=0)
 
 # Plot k-distance graph
 plt.figure(figsize=(10, 6))
-plt.plot(distances)
-plt.axhline(y=0.5, color='r', linestyle='--')  # Example threshold
-plt.title('K-Distance Graph (k=5)')
+plt.plot(distances_k)
+plt.title(f'k-Distance Graph (k={k_neighbors})')
 plt.xlabel('Data Points (sorted)')
-plt.ylabel('Distance to 5th Nearest Neighbor')
-plt.savefig(os.path.join(plots_dir, 'dbscan_epsilon_selection.png'))
+plt.ylabel(f'Distance to {k_neighbors}-th Nearest Neighbor')
+# plt.axhline(y=3.5, color='r', linestyle='--') # Example threshold line, adjust based on plot
+plt.grid(True)
+# plt.savefig(os.path.join(plots_dir, 'dbscan_epsilon_selection.png')) # EDA에서 저장됨
+plt.show()
 plt.close()
 
-# Apply DBSCAN with selected parameters
-eps = 0.5  # Selected from k-distance graph
-min_samples = 5  # Minimum number of samples in a core point's neighborhood
+# Select eps and min_samples based on the k-distance plot and data characteristics
+eps_dbscan = 3.5 # Adjust this value based on the 'elbow' in the k-distance plot
+min_samples_dbscan = k_neighbors # Often set to k used for k-distance or slightly higher
 
-dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+print(f"Selected DBSCAN parameters: eps={eps_dbscan}, min_samples={min_samples_dbscan}")
+
+# Apply DBSCAN with selected parameters
+print("\nApplying DBSCAN...")
+dbscan = DBSCAN(eps=eps_dbscan, min_samples=min_samples_dbscan)
 dbscan_labels = dbscan.fit_predict(card_data_scaled)
 
 # Add cluster labels to the original DataFrame
 card_data['DBSCAN_Cluster'] = dbscan_labels
 
-# Count number of clusters and noise points
-n_clusters = len(set(dbscan_labels)) - (1 if -1 in dbscan_labels else 0)
-n_noise = list(dbscan_labels).count(-1)
+# Analyze DBSCAN results
+n_clusters_dbscan = len(set(dbscan_labels)) - (1 if -1 in dbscan_labels else 0)
+n_noise_dbscan = list(dbscan_labels).count(-1)
 
-print(f'Number of clusters: {n_clusters}')
-print(f'Number of noise points: {n_noise}')
+print(f'\nDBSCAN found {n_clusters_dbscan} clusters and {n_noise_dbscan} noise points ({n_noise_dbscan/len(card_data)*100:.2f}%).')
 
-# Visualize cluster distribution
-plt.figure(figsize=(8, 6))
-sns.countplot(x='DBSCAN_Cluster', data=card_data)
-plt.title('Distribution of DBSCAN Clusters')
-plt.savefig(os.path.join(plots_dir, 'dbscan_cluster_distribution.png'))
-plt.close()
-
-# Analyze clusters
-dbscan_cluster_analysis = card_data.groupby('DBSCAN_Cluster').mean()
-print("\nDBSCAN Cluster Analysis:")
+# Analyze DBSCAN clusters (excluding noise)
+dbscan_cluster_analysis = card_data[card_data['DBSCAN_Cluster'] != -1].groupby('DBSCAN_Cluster').mean()
+print("\nDBSCAN Cluster Analysis (Mean Values, excluding noise):")
 print(dbscan_cluster_analysis)
 
 # %% [markdown]
-# ### 3. 모델 비교 및 선택
+# ### 4. 모델 비교 및 선택
+#
+# - Silhouette Score를 기준으로 K-Means와 DBSCAN 결과를 비교합니다.
+# - DBSCAN의 경우, 노이즈 포인트를 제외하고 Silhouette Score를 계산합니다.
+# - 더 높은 점수를 기록한 모델을 최종 모델로 선택합니다.
 
 # %%
-# Compare K-Means and DBSCAN
-# Calculate silhouette score for K-Means
-kmeans_silhouette = silhouette_score(card_data_scaled, kmeans_labels) if len(set(kmeans_labels)) > 1 else 0
+# Compare K-Means and DBSCAN using Silhouette Score
+kmeans_silhouette_score = silhouette_score(card_data_scaled, kmeans_labels)
 
 # Calculate silhouette score for DBSCAN (excluding noise points)
-dbscan_data = card_data_scaled[dbscan_labels != -1]
-dbscan_labels_no_noise = dbscan_labels[dbscan_labels != -1]
-dbscan_silhouette = silhouette_score(dbscan_data, dbscan_labels_no_noise) if len(set(dbscan_labels_no_noise)) > 1 else 0
+dbscan_valid_indices = card_data['DBSCAN_Cluster'] != -1
+if np.sum(dbscan_valid_indices) > 1 and len(set(dbscan_labels[dbscan_valid_indices])) > 1:
+    dbscan_silhouette_score = silhouette_score(card_data_scaled[dbscan_valid_indices], dbscan_labels[dbscan_valid_indices])
+else:
+    dbscan_silhouette_score = -1 # Cannot compute silhouette score
 
-print(f"K-Means Silhouette Score: {kmeans_silhouette:.3f}")
-print(f"DBSCAN Silhouette Score: {dbscan_silhouette:.3f}")
-
-# Compare cluster distributions
-plt.figure(figsize=(14, 6))
-plt.subplot(1, 2, 1)
-sns.countplot(x='KMeans_Cluster', data=card_data)
-plt.title('K-Means Clusters')
-
-plt.subplot(1, 2, 2)
-sns.countplot(x='DBSCAN_Cluster', data=card_data)
-plt.title('DBSCAN Clusters')
-
-plt.tight_layout()
-plt.savefig(os.path.join(plots_dir, 'cluster_comparison.png'))
-plt.close()
+print(f"\nK-Means Silhouette Score: {kmeans_silhouette_score:.3f}")
+print(f"DBSCAN Silhouette Score (excluding noise): {dbscan_silhouette_score:.3f}")
 
 # Decision on which model to choose
-if kmeans_silhouette > dbscan_silhouette:
-    selected_model = "K-Means"
+if kmeans_silhouette_score >= dbscan_silhouette_score:
+    selected_model_name = "K-Means"
     selected_labels = kmeans_labels
-    print("\nSelected model: K-Means")
+    selected_cluster_col = 'KMeans_Cluster'
+    print("\nSelected model: K-Means (Higher or Equal Silhouette Score)")
 else:
-    selected_model = "DBSCAN"
+    selected_model_name = "DBSCAN"
     selected_labels = dbscan_labels
-    print("\nSelected model: DBSCAN")
+    selected_cluster_col = 'DBSCAN_Cluster'
+    print("\nSelected model: DBSCAN (Higher Silhouette Score)")
 
 # %% [markdown]
-# ### 4. 군집 특성 분석
+# ### 5. 선택된 모델의 군집 특성 분석 (Radar Chart)
+#
+# - 선택된 클러스터링 모델(K-Means 또는 DBSCAN)의 결과를 사용하여 군집별 특성을 분석합니다.
+# - Radar Chart를 사용하여 각 군집의 프로파일을 시각화합니다.
 
 # %%
 # Analyze selected model's clusters
-if selected_model == "K-Means":
-    selected_clusters = card_data['KMeans_Cluster']
-    cluster_analysis = card_data.groupby('KMeans_Cluster').mean()
-else:
-    selected_clusters = card_data['DBSCAN_Cluster']
-    cluster_analysis = card_data.groupby('DBSCAN_Cluster').mean()
+print(f"\nAnalyzing clusters from {selected_model_name}...")
+cluster_analysis_selected = card_data.groupby(selected_cluster_col).mean()
 
-print("\nSelected Model Cluster Analysis:")
-print(cluster_analysis)
+# Prepare data for radar chart (use scaled data for profile comparison)
+# We need the mean of the *scaled* data per cluster
+card_data_scaled_df['Cluster'] = selected_labels
+radar_df_data = card_data_scaled_df.groupby('Cluster').mean()
 
-# Visualize cluster profiles with radar chart
-from math import pi
+# Remove noise cluster (-1) if DBSCAN was selected
+if selected_model_name == "DBSCAN" and -1 in radar_df_data.index:
+    radar_df_data = radar_df_data.drop(-1)
 
 # Function to create radar chart
 def radar_chart(df, title):
@@ -415,21 +376,26 @@ def radar_chart(df, title):
     angles += angles[:1]
     
     # Create figure
-    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
+    fig, ax = plt.subplots(figsize=(12, 12), subplot_kw=dict(polar=True))
     
     # Draw one axis per variable and add labels
-    plt.xticks(angles[:-1], categories, size=12)
+    plt.xticks(angles[:-1], categories, size=11)
     
     # Draw ylabels
     ax.set_rlabel_position(0)
-    plt.yticks([-2, -1, 0, 1, 2], ["-2", "-1", "0", "1", "2"], color="grey", size=10)
-    plt.ylim(-2, 2)
+    # Determine sensible y-axis limits based on scaled data range
+    min_val = df.min().min() - 0.5
+    max_val = df.max().max() + 0.5
+    yticks = np.linspace(np.floor(min_val), np.ceil(max_val), 5)
+    plt.yticks(yticks, [f"{tick:.1f}" for tick in yticks], color="grey", size=10)
+    plt.ylim(np.floor(min_val), np.ceil(max_val))
     
     # Plot each cluster
     for i in range(len(df)):
         values = df.iloc[i].values.tolist()
         values += values[:1]
-        ax.plot(angles, values, linewidth=2, linestyle='solid', label=f"Cluster {df.index[i]}")
+        cluster_label = df.index[i]
+        ax.plot(angles, values, linewidth=2, linestyle='solid', label=f"Cluster {cluster_label}")
         ax.fill(angles, values, alpha=0.1)
     
     # Add legend
@@ -438,163 +404,67 @@ def radar_chart(df, title):
     
     return fig
 
-# Prepare data for radar chart (excluding any noise cluster)
-if -1 in cluster_analysis.index:
-    radar_df = cluster_analysis.drop(-1)
-else:
-    radar_df = cluster_analysis
-
-# Create radar chart
-radar_fig = radar_chart(radar_df, f'{selected_model} Cluster Profiles')
-radar_fig.savefig(os.path.join(plots_dir, 'cluster_radar_chart.png'))
-plt.close()
+# Create radar chart for selected model
+print("\nGenerating Radar Chart for cluster profiles...")
+radar_fig = radar_chart(radar_df_data, f'{selected_model_name} Cluster Profiles (Standardized Means)')
+# radar_fig.savefig(os.path.join(plots_dir, 'cluster_radar_chart.png')) # EDA에서 저장됨
+plt.show()
+plt.close(radar_fig)
 
 # %% [markdown]
-# ### 5. t-SNE 시각화
+# ### 6. t-SNE 시각화
+#
+# - t-SNE 알고리즘을 적용하여 고차원 데이터를 2차원으로 축소합니다.
+# - 선택된 모델의 군집 레이블에 따라 색상을 달리하여 2차원 산점도로 시각화합니다.
 
 # %%
-# Apply t-SNE for dimensionality reduction
+# Apply t-SNE for dimensionality reduction and visualization
+print("\nApplying t-SNE for visualization...")
 tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
-tsne_results = tsne.fit_transform(card_data_scaled)
+tsne_results = tsne.fit_transform(card_data_scaled) # Use scaled data
 
-# Create DataFrame with t-SNE results
-tsne_df = pd.DataFrame(data={'t-SNE 1': tsne_results[:, 0], 't-SNE 2': tsne_results[:, 1]})
-tsne_df['Cluster'] = selected_clusters
+# Create DataFrame with t-SNE results and selected cluster labels
+tsne_df = pd.DataFrame(data={'t-SNE Dim 1': tsne_results[:, 0], 't-SNE Dim 2': tsne_results[:, 1]})
+tsne_df['Cluster'] = selected_labels
 
 # Visualize t-SNE results with cluster colors
 plt.figure(figsize=(12, 10))
+unique_labels = sorted(tsne_df['Cluster'].unique())
+palette = sns.color_palette("hls", len(unique_labels))
+
 scatter = sns.scatterplot(
-    x='t-SNE 1', y='t-SNE 2',
+    x='t-SNE Dim 1', y='t-SNE Dim 2',
     hue='Cluster',
-    palette=sns.color_palette("hls", len(set(selected_clusters))),
+    palette=palette,
+    hue_order=unique_labels, # Ensure consistent color mapping
     data=tsne_df,
     legend="full",
-    alpha=0.8
+    alpha=0.7
 )
-plt.title(f't-SNE Visualization with {selected_model} Clusters', fontsize=14)
-plt.savefig(os.path.join(plots_dir, 'tsne_visualization.png'))
+plt.title(f't-SNE Visualization with {selected_model_name} Clusters', fontsize=14)
+plt.legend(title='Cluster')
+# plt.savefig(os.path.join(plots_dir, 'tsne_visualization.png')) # EDA에서 저장됨
+plt.show()
 plt.close()
 
-# %% [markdown]
-# ## 3. 주택 가격 데이터
+print("\nAnalysis for prob2_card.csv completed.")
 
 # %% [markdown]
-# ### 주어진 데이터
-#
-# 주어진 데이터는 다음과 같습니다:
-#
-# | ID  | X   | Y    |
-# | --- | --- | ---- |
-# | 1   | 3   | 1.25 |
-# | 2   | 1   | 1.20 |
-# | 3   | 2   | 1.30 |
-# | 4   | 4   | 1.50 |
-# | 5   | ?   | 1.40 |
-# | 6   | ?   | 1.30 |
-#
-# 여기서 X는 방의 개수를, Y는 주택 가격을 나타냅니다.
+# ## 3. 주택 가격 데이터 (XGBoost 과제)
 
 # %% [markdown]
-# ### 1. XGBoost 알고리즘 - 최적의 분리 기준 찾기
-#
-# XGBoost는 **그래디언트 부스팅(Gradient Boosting)** 알고리즘의 효율적인 구현체로, 손실 함수의 그래디언트를 최소화하는 방향으로 모델을 순차적으로 개선합니다. 이 문제에서는 첫 번째 트리의 첫 마디에서 최적의 분리 기준을 찾는 과정을 설명하겠습니다.
-#
-# #### 단계 1: 초기 예측값과 그래디언트 계산
-#
-# 문제에서 모델의 초기값은 $f_0 = 0.5$로 주어졌습니다. 손실 함수는 제곱 오차(squared error)입니다:
-# $L(y, \hat{y}) = (y - \hat{y})^2$
-#
-# 그래디언트는 손실 함수를 예측값에 대해 미분한 것입니다:
-# $g_i = \frac{\partial L(y_i, f_0(x_i))}{\partial f_0(x_i)} = -2(y_i - f_0(x_i))$
-#
-# 각 데이터 포인트의 그래디언트는 다음과 같습니다:
-# - 관측치 1: $g_1 = -2(1.25 - 0.5) = -1.5$
-# - 관측치 2: $g_2 = -2(1.20 - 0.5) = -1.4$
-# - 관측치 3: $g_3 = -2(1.30 - 0.5) = -1.6$
-# - 관측치 4: $g_4 = -2(1.50 - 0.5) = -2.0$
-#
-# 또한, 제곱 오차의 2차 미분(헤시안)은 상수 2입니다:
-# $h_i = \frac{\partial^2 L(y_i, f_0(x_i))}{\partial f_0(x_i)^2} = 2$
-#
-# #### 단계 2: 가능한 분할 지점 탐색
-#
-# X의 가능한 분할 지점은 정렬된 고유값으로 X = 1, 2, 3, 4 입니다. 각 분할 지점에 대해 왼쪽과 오른쪽 노드로 데이터를 나누고 이득(gain)을 계산합니다.
-#
-# #### 단계 3: 최적 분할 선택을 위한 이득(Gain) 계산
-#
-# XGBoost에서 분할의 이득은 다음 공식으로 계산됩니다:
-#
-# $Gain = \frac{1}{2} \left[ \frac{G_L^2}{H_L} + \frac{G_R^2}{H_R} - \frac{(G_L + G_R)^2}{H_L + H_R} \right] - \gamma$
-#
-# 여기서:
-# - $G_L$, $G_R$은 각각 왼쪽/오른쪽 자식 노드의 그래디언트 합
-# - $H_L$, $H_R$은 각각 왼쪽/오른쪽 자식 노드의 헤시안 합
-# - $\gamma$는 분할 페널티 항으로, 이 문제에서는 $\lambda = 0$이므로 무시
-#
-# 예를 들어 X ≤ 2 분할에 대한 이득 계산:
-# - 왼쪽 노드(X ≤ 2): 관측치 2, 3 → $G_L = -1.4 + (-1.6) = -3.0$, $H_L = 2 + 2 = 4$
-# - 오른쪽 노드(X > 2): 관측치 1, 4 → $G_R = -1.5 + (-2.0) = -3.5$, $H_R = 2 + 2 = 4$
-# - 이득: $Gain = \frac{1}{2} \left[ \frac{(-3.0)^2}{4} + \frac{(-3.5)^2}{4} - \frac{(-3.0 - 3.5)^2}{4 + 4} \right] = \frac{1}{2} \left[ 2.25 + 3.0625 - 2.640625 \right] = 1.336$
-#
-# 모든 가능한 분할에 대해 이득을 계산하면:
-# - X ≤ 1: $Gain = 0.0456$
-# - X ≤ 2: $Gain = 0.1337$
-# - X ≤ 3: $Gain = 0.0906$
-#
-# 따라서 최적의 분할은 X ≤ 2로, 이득이 가장 큽니다.
-#
-# #### 단계 4: 트리 노드 가중치 계산
-#
-# 분할 후, 각 자식 노드의 가중치는 다음 공식으로 계산됩니다:
-#
-# $w = -\frac{G}{H+\lambda}$
-#
-# X ≤ 2 분할에 대한 가중치:
-# - 왼쪽 노드: $w_L = -\frac{-3.0}{4+0} = 0.75$
-# - 오른쪽 노드: $w_R = -\frac{-3.5}{4+0} = 0.875$
-#
-# 이 가중치는 해당 노드에서의 예측값 보정치를 의미합니다.
-
-# %% [markdown]
-# ### 2. 결측값 처리 방법
-#
-# XGBoost는 **스파스 인식(sparsity-aware)** 알고리즘으로, 결측값을 효과적으로 처리하는 방법을 내장하고 있습니다. 결측값이 있는 경우, XGBoost는 두 가지 가능성(왼쪽 또는 오른쪽 자식 노드로 보내는 것)을 모두 평가하고 이득이 최대화되는 방향을 선택합니다.
-#
-# #### 단계 1: 결측값 처리를 위한 기본 방향 결정
-#
-# 관측치 5와 6에는 X 값이 결측되어 있습니다. 이러한 결측값을 가진 관측치들을 왼쪽 또는 오른쪽 자식 노드 중 어디로 보낼지 결정하기 위해, 각 방향으로 보낼 때의 이득을 계산합니다.
-#
-# 결측값 관측치들의 그래디언트는:
-# - 관측치 5: $g_5 = -2(1.40 - 0.5) = -1.8$
-# - 관측치 6: $g_6 = -2(1.30 - 0.5) = -1.6$
-#
-# #### 단계 2: 결측값을 왼쪽 노드로 보낼 때의 이득 계산
-#
-# 결측값을 왼쪽 노드(X ≤ 2)로 보내면:
-# - 왼쪽 노드: 관측치 2, 3, 5, 6 → $G_L = -3.0 + (-1.8) + (-1.6) = -6.4$, $H_L = 4 + 2 + 2 = 8$
-# - 오른쪽 노드: 관측치 1, 4 → $G_R = -3.5$, $H_R = 4$
-# - 이득: $Gain_{left} = \frac{1}{2} \left[ \frac{(-6.4)^2}{8} + \frac{(-3.5)^2}{4} - \frac{(-6.4 - 3.5)^2}{8 + 4} \right]$
-#
-# #### 단계 3: 결측값을 오른쪽 노드로 보낼 때의 이득 계산
-#
-# 결측값을 오른쪽 노드(X > 2)로 보내면:
-# - 왼쪽 노드: 관측치 2, 3 → $G_L = -3.0$, $H_L = 4$
-# - 오른쪽 노드: 관측치 1, 4, 5, 6 → $G_R = -3.5 + (-1.8) + (-1.6) = -6.9$, $H_R = 4 + 2 + 2 = 8$
-# - 이득: $Gain_{right} = \frac{1}{2} \left[ \frac{(-3.0)^2}{4} + \frac{(-6.9)^2}{8} - \frac{(-3.0 - 6.9)^2}{4 + 8} \right]$
-#
-# #### 단계 4: 최적의 방향 선택
-#
-# 두 이득을 비교하여 더 큰 이득을 제공하는 방향으로 결측값을 보냅니다. 계산 결과 $Gain_{right} > Gain_{left}$ 이므로, 관측치 5와 6은 오른쪽 노드(X > 2)로 보내는 것이 최적입니다.
-#
-# 이는 XGBoost가 결측값을 효율적으로 처리하는 핵심 메커니즘으로, 모든 가능한 결측값 위치에 대해 최적의 방향을 데이터 기반으로 결정합니다.
+# ### (설명 생략 - EDA 대상 아님)
+# - 이 섹션은 `final_exam.md`의 XGBoost 관련 계산 과제를 위한 코드 또는 설명을 포함할 수 있으나, 현재 EDA의 범위는 아닙니다.
+# - `final_gpt.py`의 원래 코드에는 이 부분에 대한 구현이 포함되어 있지 않았습니다.
+# - 필요시, 별도의 셀에서 XGBoost 계산 과정을 수동으로 구현하거나 설명할 수 있습니다.
 
 # %%
-# 주택 가격 데이터셋 출력 (시각화 목적)
+# 예시: 주택 가격 데이터셋 출력 (참고용)
 housing_data = pd.DataFrame({
     'ID': [1, 2, 3, 4, 5, 6],
     'X': [3, 1, 2, 4, None, None],
     'Y': [1.25, 1.20, 1.30, 1.50, 1.40, 1.30]
 })
 
-print("Housing Dataset:")
+print("\n--- Housing Dataset (XGBoost Problem) ---")
 print(housing_data)
