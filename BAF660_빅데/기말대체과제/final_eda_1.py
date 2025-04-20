@@ -110,20 +110,41 @@ plt.close(fig)
 #
 # 이전 논의에 따라 다음과 같은 변환 전략을 적용합니다:
 # - **job, marital, contact**: 순서 없는 범주형 변수 -> 원-핫 인코딩
-# - **education**: 순서 있는 범주형 변수 -> 순서형 인코딩 (primary=0, secondary=1, tertiary=2), 'unknown'은 NaN으로 처리
+# - **education**: 순서 있는 범주형 변수 -> 순서형 인코딩 (primary=0, secondary=1, tertiary=2), 'unknown'은 NaN 처리 후 **가중 평균(Weighted Mean)**으로 대체
 # - **default, housing, loan, y**: 이진 변수 -> 0/1 인코딩
 # - **month**: 순환형 변수 -> Sin/Cos 변환
+#
+# **교육 수준('unknown') 처리 방식 설명:**
+# 'unknown' 값을 처리하는 여러 방법 중 가중 평균 방식은 다음과 같은 장점을 가질 수 있습니다:
+# *   **정보 활용**: 단순히 최빈값이나 중앙값으로 대체하는 것보다 데이터에 존재하는 다른 교육 수준의 분포 정보를 활용합니다. 각 교육 수준(primary, secondary, tertiary)의 빈도수를 가중치로 사용하여 평균을 계산하므로, 전체 데이터의 분포 특성을 어느 정도 반영할 수 있습니다.
+# *   **단순 상수 대체보다 나은 가정**: 임의의 상수(-1 등)로 대체하는 것보다 데이터 기반의 값을 사용합니다.
+#
+# 하지만 이 방법 역시 **주의점**이 있습니다. 계산된 가중 평균값은 0, 1, 2 와 같은 정수가 아닐 수 있으며, 이는 본래 순서형 변수의 의미를 약간 희석시킬 수 있습니다. 또한, 'unknown' 그룹이 실제로는 특정 교육 수준 분포와 매우 다를 경우, 이 방법이 반드시 정확한 추정이라고 보장할 수는 없습니다.
+#
+# **데이터 유출(Data Leakage) 주의점:**
+# 본 EDA 분석에서는 전체 데이터를 사용하여 결측치를 대체하지만, 실제 예측 모델링 시나리오에서는 **데이터 유출(Data Leakage)**을 방지하는 것이 매우 중요합니다. 즉, **훈련/테스트 데이터를 분할한 후**, 훈련 데이터의 정보만을 사용하여 결측치 대체 전략(예: 가중 평균 계산)을 결정하고, 이를 훈련 데이터와 테스트 데이터 양쪽에 **동일하게** 적용해야 합니다. 테스트 데이터의 정보가 훈련 단계의 결측치 대체에 사용되어서는 안 됩니다. 본 과제에서는 모델링이 요구되지 않아 분할 전 전체 데이터에 적용합니다.
 
 # %%
 # 변환을 위한 데이터프레임 복사
 bank_transformed = bank_data.copy()
 
-# education 변환 (순서형 + unknown 처리)
+# education 변환 (순서형 + unknown 처리 -> 가중 평균 대체)
 education_map = {'primary': 0, 'secondary': 1, 'tertiary': 2, 'unknown': np.nan}
 bank_transformed['education_encoded'] = bank_transformed['education'].map(education_map)
-print("\nEducation 변환 후 (unknown은 NaN):")
+
+# 가중 평균 계산 (NaN 제외)
+known_edu = bank_transformed['education_encoded'].dropna()
+weights = known_edu.value_counts(normalize=True) # 각 값의 비율을 가중치로 사용
+weighted_mean_edu = np.average(weights.index, weights=weights.values)
+
+print(f"\nEducation 'unknown' 대체 가중 평균값: {weighted_mean_edu:.4f}")
+
+# NaN 값을 가중 평균으로 대체
+bank_transformed['education_encoded'].fillna(weighted_mean_edu, inplace=True)
+
+print("\nEducation 가중 평균 대체 후:")
 print(bank_transformed[['education', 'education_encoded']].head(10))
-print(bank_transformed['education_encoded'].isnull().sum(), "개의 unknown 값 (NaN으로 변환)")
+print("NaN 값 없음 확인:", bank_transformed['education_encoded'].isnull().sum() == 0)
 
 # 이진 변수 변환 (default, housing, loan, y)
 binary_cols = ['default', 'housing', 'loan', 'y']
@@ -189,6 +210,37 @@ for i, col in enumerate(numerical_cols):
     
     plt.tight_layout()
     plot_filename = os.path.join(plot_dir_eda1, f'numerical_distribution_{col}.png')
+    plt.savefig(plot_filename)
+    plt.show()
+    plt.close(fig)
+
+# %% [markdown]
+# ### 3.2.1 수치형 변수와 목표 변수 관계 분석
+
+# %%
+# 목표 변수(y_encoded)와 각 수치형 변수 간의 관계 시각화
+
+# 임시로 사용할 데이터프레임 생성 (변환된 목표 변수 포함)
+temp_df = bank_data.copy() # 원본 데이터를 사용
+temp_df['y_encoded'] = bank_transformed['y_encoded'] # 앞서 인코딩된 목표 변수 추가
+
+for col in numerical_cols:
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    
+    # 박스 플롯 (목표 변수별 분포 비교)
+    sns.boxplot(x='y_encoded', y=col, data=temp_df, ax=axes[0])
+    axes[0].set_title(f'{col} Distribution by Target Variable')
+    axes[0].set_xlabel('Target Variable (0: No, 1: Yes)')
+    axes[0].set_ylabel(col)
+    
+    # KDE 플롯 (목표 변수별 밀도 비교)
+    sns.kdeplot(data=temp_df, x=col, hue='y_encoded', fill=True, common_norm=False, ax=axes[1])
+    axes[1].set_title(f'{col} Density by Target Variable')
+    axes[1].set_xlabel(col)
+    axes[1].legend(title='Target Variable', labels=['Yes', 'No']) # hue 순서에 맞게 라벨 조정
+    
+    plt.tight_layout()
+    plot_filename = os.path.join(plot_dir_eda1, f'numerical_vs_target_{col}.png')
     plt.savefig(plot_filename)
     plt.show()
     plt.close(fig)
@@ -555,6 +607,37 @@ plot_filename = os.path.join(plot_dir_eda1, f'binning_{bin_col}.png')
 plt.savefig(plot_filename)
 plt.show()
 plt.close(fig)
+
+# %% [markdown]
+# ### 3.2.1 수치형 변수와 목표 변수 관계 분석
+
+# %%
+# 목표 변수(y_encoded)와 각 수치형 변수 간의 관계 시각화
+
+# 임시로 사용할 데이터프레임 생성 (변환된 목표 변수 포함)
+temp_df = bank_data.copy() # 원본 데이터를 사용
+temp_df['y_encoded'] = bank_transformed['y_encoded'] # 앞서 인코딩된 목표 변수 추가
+
+for col in numerical_cols:
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    
+    # 박스 플롯 (목표 변수별 분포 비교)
+    sns.boxplot(x='y_encoded', y=col, data=temp_df, ax=axes[0])
+    axes[0].set_title(f'{col} Distribution by Target Variable')
+    axes[0].set_xlabel('Target Variable (0: No, 1: Yes)')
+    axes[0].set_ylabel(col)
+    
+    # KDE 플롯 (목표 변수별 밀도 비교)
+    sns.kdeplot(data=temp_df, x=col, hue='y_encoded', fill=True, common_norm=False, ax=axes[1])
+    axes[1].set_title(f'{col} Density by Target Variable')
+    axes[1].set_xlabel(col)
+    axes[1].legend(title='Target Variable', labels=['Yes', 'No']) # hue 순서에 맞게 라벨 조정
+    
+    plt.tight_layout()
+    plot_filename = os.path.join(plot_dir_eda1, f'numerical_vs_target_{col}.png')
+    plt.savefig(plot_filename)
+    plt.show()
+    plt.close(fig)
 
 # %% [markdown]
 # ## 6. 특성 선택 (Feature Selection)

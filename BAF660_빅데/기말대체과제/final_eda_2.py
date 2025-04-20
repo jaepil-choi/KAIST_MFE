@@ -239,8 +239,8 @@ plt.close(fig_if_2d)
 
 # %% [markdown]
 # ### 4.3 이상치 처리 (예시)
-# - 클러스터링 알고리즘은 이상치에 민감할 수 있으므로, 처리 방법을 고려해야 합니다.
-# - 여기서는 IQR 기반 클리핑을 예시로 적용하지만, 실제 모델링 시에는 제거, 다른 대체 방법 등을 실험해볼 수 있습니다.
+# - 클러스터링 알고리즘, 특히 K-Means는 이상치에 민감하므로 처리 방법을 고려해야 합니다.
+# - 여기서는 IQR 기반 클리핑을 예시로 적용하여 극단적인 값의 영향을 줄입니다. 실제 모델링 시에는 제거, 다른 대체 방법 등을 실험해볼 수 있습니다.
 
 # %%
 # IQR 기반 클리핑 함수 정의 (재사용)
@@ -264,9 +264,9 @@ print(card_clipped.describe())
 # ## 5. 특성 변환
 
 # %% [markdown]
-# ### 5.1 스케일링
+# ### 5.1 스케일링 (StandardScaler)
 # - 클러스터링은 거리 기반 알고리즘이 많으므로 스케일링이 필수적입니다.
-# - 이상치 처리된 데이터를 StandardScaler로 표준화합니다.
+# - 이상치 처리(클리핑)된 데이터를 StandardScaler로 표준화합니다. 이 데이터를 후속 분석(PCA, 군집화 등)의 기본 입력으로 사용합니다.
 
 # %%
 # 이상치 처리된 데이터에 StandardScaler 적용
@@ -281,13 +281,13 @@ print(X_card_scaled_df.describe())
 fig_scale, axes_scale = plt.subplots(2, 2, figsize=(12, 10))
 
 sns.histplot(card_clipped['BALANCE'], kde=True, ax=axes_scale[0, 0])
-axes_scale[0, 0].set_title('Original Clipped Data: BALANCE')
+axes_scale[0, 0].set_title('Clipped Data: BALANCE')
 
 sns.histplot(X_card_scaled_df['BALANCE'], kde=True, ax=axes_scale[0, 1])
 axes_scale[0, 1].set_title('StandardScaler: BALANCE')
 
 sns.histplot(card_clipped['PURCHASES'], kde=True, ax=axes_scale[1, 0])
-axes_scale[1, 0].set_title('Original Clipped Data: PURCHASES')
+axes_scale[1, 0].set_title('Clipped Data: PURCHASES')
 
 sns.histplot(X_card_scaled_df['PURCHASES'], kde=True, ax=axes_scale[1, 1])
 axes_scale[1, 1].set_title('StandardScaler: PURCHASES')
@@ -297,6 +297,46 @@ plot_filename_scale = os.path.join(plot_dir_eda2, 'scaling_comparison_sample.png
 plt.savefig(plot_filename_scale)
 plt.show()
 plt.close(fig_scale)
+
+# %% [markdown]
+# ### 5.2 로그 변환 탐색 (Log Transformation Exploration)
+# - EDA 결과 많은 변수들이 오른쪽으로 심하게 치우쳐 있습니다 (높은 왜도).
+# - 로그 변환(`np.log1p`)은 이러한 왜도를 줄여 데이터를 정규분포에 가깝게 만들 수 있으며, 이는 거리 기반 알고리즘(K-Means 등)의 성능을 개선할 수 있습니다.
+# - 여기서는 주요 변수에 로그 변환을 적용하여 분포 변화를 탐색합니다. (주의: 0 값이 있을 수 있으므로 `log1p` 사용)
+# - 실제 모델링에서는 로그 변환 후 스케일링을 적용하는 것이 일반적입니다.
+
+# %%
+# 로그 변환 적용 및 시각화 (왜도가 높은 변수 대상)
+skewed_cols = card_numerical_stats[card_numerical_stats['왜도'] > 2].index.tolist()
+print(f"\n로그 변환 탐색 대상 변수 (왜도 > 2): {skewed_cols}")
+
+plt.figure(figsize=(15, len(skewed_cols)*4))
+
+for i, col in enumerate(skewed_cols):
+    # 로그 변환 적용 (log1p 사용)
+    log_transformed_col = np.log1p(card_data[col]) # 원본 또는 클리핑된 데이터에 적용 가능, 여기서는 원본 사용
+    
+    # 원본 데이터 분포
+    plt.subplot(len(skewed_cols), 2, 2*i+1)
+    sns.histplot(card_data[col], kde=True)
+    plt.title(f'Original Distribution: {col} (Skew: {card_data[col].skew():.2f})')
+    
+    # 로그 변환 후 분포
+    plt.subplot(len(skewed_cols), 2, 2*i+2)
+    sns.histplot(log_transformed_col, kde=True)
+    plt.title(f'Log Transformed Distribution: {col} (Skew: {log_transformed_col.skew():.2f})')
+
+plt.tight_layout()
+plot_filename_log = os.path.join(plot_dir_eda2, 'log_transformation_comparison.png')
+plt.savefig(plot_filename_log)
+plt.show()
+plt.close()
+
+# %% [markdown]
+# **변환 선택에 대한 고찰:**
+# - 로그 변환은 왜도를 효과적으로 줄여주지만, 모든 변수에 일괄적으로 적용하기는 어렵고 변환 후 해석이 복잡해질 수 있습니다.
+# - 이상치 처리(클리핑) 후 표준화(StandardScaler)는 클러스터링을 위한 일반적이고 안정적인 전처리 방법입니다.
+# - 본 EDA에서는 이상치 처리 및 표준화된 데이터를 주로 사용하되, 로그 변환의 효과도 확인했습니다. 실제 모델링 시에는 다양한 전처리 조합을 실험하여 클러스터링 성능을 비교하는 것이 좋습니다.
 
 # %% [markdown]
 # ## 6. 상관관계 분석
