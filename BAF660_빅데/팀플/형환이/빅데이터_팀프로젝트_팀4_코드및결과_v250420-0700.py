@@ -22,6 +22,7 @@ os.environ['PYTHONHASHSEED'] = str(SEED)
 
 # 결과 저장을 위한 디렉토리 생성
 os.makedirs('model_results', exist_ok=True)
+os.makedirs('plots', exist_ok=True)  # plots 디렉토리 생성
 
 # %% [markdown]
 # ## 1. 데이터 불러오기 및 데이터 확인 : 12개의 수치형변수와 15개의 문자형 변수(목적변수 포함)
@@ -42,9 +43,11 @@ data.info()
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+plt.figure(figsize=(10, 6))
 sns.countplot(x=data['loan_status'])
-plt.title("Class Imbalace")
-plt.show()
+plt.title("Class Imbalance")
+plt.savefig('plots/class_imbalance.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %%
 # 수치형 데이터간 상관관계 행렬 그리기 : 일부 변수에 높은 상관관계가 존재하는 것을 확인
@@ -53,7 +56,9 @@ plt.figure(figsize=(12, 8))
 numeric_data = data.select_dtypes(include=['number'])
 
 sns.heatmap(numeric_data.corr(), annot=True, cmap='viridis')
-plt.show()
+plt.title("Correlation Matrix of Numeric Features")
+plt.savefig('plots/correlation_matrix.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # ### 1.2 주요 변수별 목적변수 분포 확인
@@ -80,7 +85,8 @@ ax.set_xticklabels(grades)
 ax.legend()
 plt.xticks(rotation=0)
 plt.tight_layout()
-plt.show()
+plt.savefig('plots/loan_status_by_grade.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %%
 # 대출기간, 집보유여부 등 주요 변수에 대한 목적변수 분포 확인
@@ -98,6 +104,9 @@ sns.countplot(x='verification_status', data=data, hue='loan_status')
 plt.subplot(4, 2, 4)
 g = sns.countplot(x='purpose', data=data, hue='loan_status')
 g.set_xticklabels(g.get_xticklabels(), rotation=90)
+
+plt.savefig('plots/loan_status_by_features.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %%
 # 문자형 변수 고유값 개수 출력 : 일부 변수에 과도하게 많은 고유값 확인
@@ -216,7 +225,8 @@ plt.ylabel('Debt-to-Income Ratio (DTI)')
 plt.title('Isolation Forest Outlier Detection (2D)')
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.savefig('plots/isolation_forest_outlier_detection_2d.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # ### 3.2 TSNE를 이용한 차원 축소 및 이상치 시각화
@@ -255,7 +265,8 @@ ax.set_xlabel('t-SNE 1')
 ax.set_ylabel('t-SNE 2')
 ax.set_zlabel('t-SNE 3')
 ax.legend()
-plt.show()
+plt.savefig('plots/tsne_visualization.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %%
 # 병렬 시각화
@@ -291,7 +302,8 @@ ax2.set_zlabel('t-SNE 3')
 ax2.legend()
 
 plt.tight_layout()
-plt.show()
+plt.savefig('plots/tsne_of_outliers.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # ## 4. Boruta 알고리즘을 활용한 변수선택
@@ -546,7 +558,8 @@ plt.ylabel('Log Loss')
 plt.title('XGBoost Training Curve')
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.savefig('plots/learning_curve.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # 테스트 데이터에 대한 예측
 y_pred_best = final_model.predict(X_test_brtfs)
@@ -571,7 +584,8 @@ plt.title("Predict probability")
 plt.xlabel("Probability of Class 1")
 plt.ylabel("Count")
 plt.grid(True)
-plt.show()
+plt.savefig('plots/prediction_probability.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %%
 # Confusion Matrix
@@ -580,7 +594,8 @@ sns.heatmap(confusion_matrix(y_test, y_pred_best), annot=True, fmt='d', cmap='Gr
 plt.title('Confusion Matrix (Best Model)')
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
-plt.show()
+plt.savefig('plots/confusion_matrix.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %%
 # ROC Curve
@@ -593,7 +608,8 @@ plt.ylabel('True Positive Rate')
 plt.title('Best Model ROC Curve')
 plt.legend()
 plt.grid(True)
-plt.show()
+plt.savefig('plots/roc_curve.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # ## 6. 변수 중요도 분석
@@ -616,7 +632,8 @@ plt.title("Top 20 Feature Importances (XGBoost)")
 plt.xlabel("Importance Score")
 plt.ylabel("Feature")
 plt.grid(True)
-plt.show()
+plt.savefig('plots/feature_importance.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # XGBoost의 기본 변수 중요도는 모델 전체에서 각 특성이 얼마나 자주 사용되었는지를 보여줍니다.
@@ -685,7 +702,8 @@ shap.force_plot(explainer.expected_value,
                 matplotlib=True, show=False)
 plt.title("SHAP Force Plot - 부도 사례")
 plt.tight_layout()
-plt.show()
+plt.savefig('plots/shap_force_plot_default.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # SHAP Force Plot - 정상 상환 사례
 plt.figure(figsize=(16, 5))
@@ -696,7 +714,8 @@ shap.force_plot(explainer.expected_value,
                 matplotlib=True, show=False)
 plt.title("SHAP Force Plot - 정상 상환 사례")
 plt.tight_layout()
-plt.show()
+plt.savefig('plots/shap_force_plot_paid.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # ### 6.4 SHAP 글로벌 분석 - 전체 특성 중요도
@@ -707,7 +726,8 @@ plt.figure(figsize=(12, 10))
 shap.summary_plot(shap_values, X_train_sample, plot_type="bar", show=False)
 plt.title("SHAP Feature Importance")
 plt.tight_layout()
-plt.show()
+plt.savefig('plots/shap_feature_importance.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %%
 # SHAP Summary Plot - 각 특성값에 따른 영향력 변화 시각화
@@ -715,7 +735,8 @@ plt.figure(figsize=(12, 10))
 shap.summary_plot(shap_values, X_train_sample, show=False)
 plt.title("SHAP Summary Plot")
 plt.tight_layout()
-plt.show()
+plt.savefig('plots/shap_summary_plot.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # SHAP 요약 플롯의 해석:
@@ -746,8 +767,8 @@ plt.xlabel('Recall')
 plt.ylabel('Precision')
 plt.title('Precision-Recall Curve')
 plt.grid(True)
-plt.legend()
-plt.show()
+plt.savefig('plots/precision_recall_curve.png', bbox_inches='tight', dpi=300)
+plt.close()
 
 # %% [markdown]
 # ## 7. 결론

@@ -26,7 +26,7 @@
 
 ### 2.2 수치형 변수 분석
 
-![Heatmap of Correlation Matrix](placeholder)
+![Heatmap of Correlation Matrix](plots/correlation_matrix.png)
 *그림 설명: 수치형 변수 간 상관계수를 시각화한 히트맵. 전반적인 상관관계는 낮으나, 일부 변수는 변수 선택 단계에서 제외할 예정입니다.*
 
 ### 2.3 문자형 변수 분석
@@ -38,7 +38,7 @@
 - **관찰 결과:** 신용 등급(grade)에 따른 부도율 상승 경향 확인  
 - 일부 문자형 변수는 고유값 수가 많아 분석에서 제외 고려
 
-![Categorical Variable Distributions](placeholder)
+![Categorical Variable Distributions](plots/loan_status_by_features.png)
 *그림 설명: 주요 문자형 변수별 분포 및 연체 여부와의 관계.*
 
 ---
@@ -63,7 +63,7 @@
    - Boruta 알고리즘을 적용하여 11개 변수(수치형·라벨 인코딩) 선택  
    - 최종 데이터: 문자형 변수 7개(원-핫 6 + 라벨 1), 수치형 변수 9개, 목적 변수 1개
 
-![T-SNE after Outlier Removal](placeholder)
+![T-SNE after Outlier Removal](plots/tsne_visualization.png)
 *그림 설명: 이상치 제거 후 T-SNE 3차원 축소 결과.*
 
 ---
@@ -97,15 +97,15 @@
 
 > **결과:** 모든 모델 F1-score ≥ 0.93, ROC AUC ≈ 0.90로 높은 예측 성능 확인
 
-![XGBoost Confusion Matrix](placeholder)
+![XGBoost Confusion Matrix](plots/confusion_matrix.png)
 *그림 설명: XGBoost 최종 모델의 혼동 행렬.*
 
-![XGBoost Precision-Recall Curve](placeholder)
+![XGBoost Precision-Recall Curve](plots/precision_recall_curve.png)
 *그림 설명: XGBoost 최종 모델의 Precision-Recall 커브.*
 
 ### 4.4 변수 중요도
 
-![XGBoost Feature Importance](placeholder)
+![XGBoost Feature Importance](plots/shap_feature_importance.png)
 *그림 설명: XGBoost 모델에서 주요하게 작용한 변수(대출 목적, 주거 형태, 이자율 등).* 
 
 ---
