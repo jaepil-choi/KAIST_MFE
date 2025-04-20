@@ -7,6 +7,22 @@
 #
 # 코드 추가
 
+# %%
+# 모든 난수 생성에 일관된 시드 설정 - 재현성 확보
+import numpy as np
+import random
+import os
+import pickle
+
+# 모든 난수 생성기에 일관된 시드 설정
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+os.environ['PYTHONHASHSEED'] = str(SEED)
+
+# 결과 저장을 위한 디렉토리 생성
+os.makedirs('model_results', exist_ok=True)
+
 # %% [markdown]
 # ## 1. 데이터 불러오기 및 데이터 확인 : 12개의 수치형변수와 15개의 문자형 변수(목적변수 포함)
 
@@ -363,52 +379,79 @@ from sklearn.pipeline import Pipeline
 from imblearn.pipeline import Pipeline as ImbPipeline
 from imblearn.over_sampling import ADASYN
 from sklearn.model_selection import RandomizedSearchCV
+import os
+import pickle
 
-# ADASYN을 파이프라인 내에서 적용하여 교차 검증 시 검증 데이터 무결성 유지
-step1_pipeline = ImbPipeline([
-    ('sampler', ADASYN(random_state=42)),
-    ('classifier', XGBClassifier(eval_metric='logloss', random_state=42, learning_rate=0.1))
-])
+# 하이퍼파라미터 검색 결과를 저장할 경로 설정
+hp_search_results_path = 'model_results/hp_search_results.pkl'
 
-# 하이퍼파라미터 설정 - 고정된 n_estimators로 공정한 비교 보장
-param_dist = {
-    'classifier__n_estimators': [100, 300, 500],  # 고정된 값으로 탐색
-    'classifier__max_depth': [3, 5, 7, 9],
-    'classifier__min_child_weight': [0, 0.1, 0.3, 0.5],
-    'classifier__gamma': [0, 0.1, 1],
-    'classifier__subsample': [0.6, 0.8, 1.0],
-    'classifier__colsample_bytree': [0.6, 0.8, 1.0],
-    'classifier__reg_alpha': [0, 0.1, 1],
-    'classifier__reg_lambda': [1, 5, 10]
-}
-
-# RandomizedSearchCV - 각 CV 폴드 내에서 올바르게 ADASYN 적용
-step1_search = RandomizedSearchCV(
-    estimator=step1_pipeline,
-    param_distributions=param_dist,
-    n_iter=25,  # 계산 자원에 따라 조정 가능
-    scoring='f1',
-    cv=3,
-    verbose=1,
-    random_state=42,
-    n_jobs=-1
-)
-
-# 1단계 모델 훈련
-print("1단계: 초기 하이퍼파라미터 탐색 중...")
-step1_search.fit(X_train_brtfs, y_train_clean)
-
-# 최적 하이퍼파라미터 출력
-print("최적 하이퍼파라미터:")
-print(step1_search.best_params_)
-print("최고 F1 점수 (CV):", step1_search.best_score_)
-
-# 상위 5개 하이퍼파라미터 조합 확인
-step1_results = pd.DataFrame(step1_search.cv_results_)
-columns = ['params', 'mean_test_score', 'std_test_score', 'rank_test_score']
-top_5_params = step1_results[columns].sort_values('rank_test_score').head(5)
-print("\n상위 5개 하이퍼파라미터 조합:")
-print(top_5_params)
+# 이미 저장된 하이퍼파라미터 결과가 있는지 확인
+if os.path.exists(hp_search_results_path):
+    print("저장된 하이퍼파라미터 검색 결과를 불러옵니다...")
+    with open(hp_search_results_path, 'rb') as f:
+        step1_search = pickle.load(f)
+    
+    print("최적 하이퍼파라미터:")
+    print(step1_search.best_params_)
+    print("최고 F1 점수 (CV):", step1_search.best_score_)
+    
+    # 상위 5개 하이퍼파라미터 조합 확인
+    step1_results = pd.DataFrame(step1_search.cv_results_)
+    columns = ['params', 'mean_test_score', 'std_test_score', 'rank_test_score']
+    top_5_params = step1_results[columns].sort_values('rank_test_score').head(5)
+    print("\n상위 5개 하이퍼파라미터 조합:")
+    print(top_5_params)
+else:
+    # ADASYN을 파이프라인 내에서 적용하여 교차 검증 시 검증 데이터 무결성 유지
+    step1_pipeline = ImbPipeline([
+        ('sampler', ADASYN(random_state=42)),
+        ('classifier', XGBClassifier(eval_metric='logloss', random_state=42, learning_rate=0.1))
+    ])
+    
+    # 하이퍼파라미터 설정 - 고정된 n_estimators로 공정한 비교 보장
+    param_dist = {
+        'classifier__n_estimators': [100, 300, 500],  # 고정된 값으로 탐색
+        'classifier__max_depth': [3, 5, 7, 9],
+        'classifier__min_child_weight': [0, 0.1, 0.3, 0.5],
+        'classifier__gamma': [0, 0.1, 1],
+        'classifier__subsample': [0.6, 0.8, 1.0],
+        'classifier__colsample_bytree': [0.6, 0.8, 1.0],
+        'classifier__reg_alpha': [0, 0.1, 1],
+        'classifier__reg_lambda': [1, 5, 10]
+    }
+    
+    # RandomizedSearchCV - 각 CV 폴드 내에서 올바르게 ADASYN 적용
+    step1_search = RandomizedSearchCV(
+        estimator=step1_pipeline,
+        param_distributions=param_dist,
+        n_iter=25,  # 계산 자원에 따라 조정 가능
+        scoring='f1',
+        cv=3,
+        verbose=1,
+        random_state=42,
+        n_jobs=-1
+    )
+    
+    # 1단계 모델 훈련
+    print("1단계: 초기 하이퍼파라미터 탐색 중...")
+    step1_search.fit(X_train_brtfs, y_train_clean)
+    
+    # 최적 하이퍼파라미터 출력
+    print("최적 하이퍼파라미터:")
+    print(step1_search.best_params_)
+    print("최고 F1 점수 (CV):", step1_search.best_score_)
+    
+    # 상위 5개 하이퍼파라미터 조합 확인
+    step1_results = pd.DataFrame(step1_search.cv_results_)
+    columns = ['params', 'mean_test_score', 'std_test_score', 'rank_test_score']
+    top_5_params = step1_results[columns].sort_values('rank_test_score').head(5)
+    print("\n상위 5개 하이퍼파라미터 조합:")
+    print(top_5_params)
+    
+    # 하이퍼파라미터 검색 결과 저장
+    print("\n하이퍼파라미터 검색 결과를 저장합니다...")
+    with open(hp_search_results_path, 'wb') as f:
+        pickle.dump(step1_search, f)
 
 # %% [markdown]
 # ### 5.3 최적 모델 미세 조정 및 성능 평가
@@ -418,6 +461,9 @@ print(top_5_params)
 
 # %%
 # 2단계: 최적 모델 미세 조정 - 낮은 학습률, 높은 n_estimators, early stopping
+
+# 최종 모델 파일 경로
+final_model_path = 'model_results/final_model.pkl'
 
 # 1단계에서 찾은 최적 하이퍼파라미터 가져오기
 best_params = step1_search.best_params_
@@ -431,47 +477,70 @@ X_train_final, X_val_final, y_train_final, y_val_final = train_test_split(
     X_train_brtfs, y_train_clean, test_size=0.1, random_state=42, stratify=y_train_clean
 )
 
-# ADASYN 적용 (최종 훈련 데이터에만)
-adasyn = ADASYN(random_state=42)
-X_train_final_resampled, y_train_final_resampled = adasyn.fit_resample(X_train_final, y_train_final)
+# 이미 학습된 최종 모델이 있는지 확인
+if os.path.exists(final_model_path):
+    print("저장된 최종 모델을 불러옵니다...")
+    with open(final_model_path, 'rb') as f:
+        final_model = pickle.load(f)
+        # 저장된 평가 결과 불러오기
+    evals_result_path = 'model_results/evals_result.pkl'
+    if os.path.exists(evals_result_path):
+        with open(evals_result_path, 'rb') as f:
+            evals_result = pickle.load(f)
+    # 최적 트리 개수 확인 (XGBoost 버전에 따라 속성 이름이 다를 수 있음)
+    best_iteration = final_model.best_iteration if hasattr(final_model, 'best_iteration') else None
+    print(f"최적 트리 개수: {best_iteration}")
+else:
+    # ADASYN 적용 (최종 훈련 데이터에만)
+    adasyn = ADASYN(random_state=42)
+    X_train_final_resampled, y_train_final_resampled = adasyn.fit_resample(X_train_final, y_train_final)
+    
+    # 최종 모델 생성 - 낮은 학습률, 높은 n_estimators, early stopping 적용
+    final_model = XGBClassifier(
+        # 1단계에서 찾은 최적 하이퍼파라미터 적용
+        max_depth=int(best_params['classifier__max_depth']),
+        min_child_weight=best_params['classifier__min_child_weight'],
+        gamma=best_params['classifier__gamma'],
+        subsample=best_params['classifier__subsample'],
+        colsample_bytree=best_params['classifier__colsample_bytree'],
+        reg_alpha=best_params['classifier__reg_alpha'],
+        reg_lambda=best_params['classifier__reg_lambda'],
+        # 미세 조정을 위한 파라미터
+        learning_rate=0.01,           # 낮은 학습률
+        n_estimators=10000,           # 많은 트리 개수
+        early_stopping_rounds=200,    # 조기 중단
+        eval_metric='logloss',        # 평가 지표
+        random_state=42,
+        verbosity=1
+    )
+    
+    # 최종 모델 훈련 - 검증 데이터로 early stopping 모니터링
+    print("\n2단계: 최적 모델 미세 조정 중...")
+    final_model.fit(
+        X_train_final_resampled, y_train_final_resampled,
+        eval_set=[(X_train_final_resampled, y_train_final_resampled), 
+                  (X_val_final, y_val_final)],
+        verbose=True
+    )
+    
+    # 학습 결과 및 모델 저장
+    with open(final_model_path, 'wb') as f:
+        pickle.dump(final_model, f)
+    
+    # 평가 결과 저장
+    evals_result = final_model.evals_result()
+    with open('model_results/evals_result.pkl', 'wb') as f:
+        pickle.dump(evals_result, f)
 
-# 최종 모델 생성 - 낮은 학습률, 높은 n_estimators, early stopping 적용
-final_model = XGBClassifier(
-    # 1단계에서 찾은 최적 하이퍼파라미터 적용
-    max_depth=int(best_params['classifier__max_depth']),
-    min_child_weight=best_params['classifier__min_child_weight'],
-    gamma=best_params['classifier__gamma'],
-    subsample=best_params['classifier__subsample'],
-    colsample_bytree=best_params['classifier__colsample_bytree'],
-    reg_alpha=best_params['classifier__reg_alpha'],
-    reg_lambda=best_params['classifier__reg_lambda'],
-    # 미세 조정을 위한 파라미터
-    learning_rate=0.01,           # 낮은 학습률
-    n_estimators=10000,           # 많은 트리 개수
-    early_stopping_rounds=200,    # 조기 중단
-    eval_metric='logloss',        # 평가 지표
-    random_state=42,
-    verbosity=1
-)
-
-# 최종 모델 훈련 - 검증 데이터로 early stopping 모니터링
-print("\n2단계: 최적 모델 미세 조정 중...")
-final_model.fit(
-    X_train_final_resampled, y_train_final_resampled,
-    eval_set=[(X_train_final_resampled, y_train_final_resampled), 
-              (X_val_final, y_val_final)],
-    verbose=True
-)
-
-# 최적 트리 개수 확인
-print(f"최적 트리 개수: {final_model.best_ntree_limit}")
+# 최적 트리 개수 확인 (XGBoost 버전에 따라 속성 이름이 다를 수 있음)
+best_iteration = final_model.best_iteration if hasattr(final_model, 'best_iteration') else None
+print(f"최적 트리 개수: {best_iteration}")
 
 # 학습 곡선 시각화
-evals_result = final_model.evals_result()
 plt.figure(figsize=(10, 6))
 plt.plot(evals_result['validation_0']['logloss'], label='Training')
 plt.plot(evals_result['validation_1']['logloss'], label='Validation')
-plt.axvline(x=final_model.best_ntree_limit, color='r', linestyle='--', label=f'Best ntree: {final_model.best_ntree_limit}')
+plt.axvline(x=best_iteration, color='r', linestyle='--', label=f'Best iteration: {best_iteration}')
 plt.xlabel('Number of Trees')
 plt.ylabel('Log Loss')
 plt.title('XGBoost Training Curve')
@@ -480,8 +549,8 @@ plt.grid(True)
 plt.show()
 
 # 테스트 데이터에 대한 예측
-y_pred_best = final_model.predict(X_test_brtfs, ntree_limit=final_model.best_ntree_limit)
-y_proba_best = final_model.predict_proba(X_test_brtfs, ntree_limit=final_model.best_ntree_limit)[:, 1]
+y_pred_best = final_model.predict(X_test_brtfs)
+y_proba_best = final_model.predict_proba(X_test_brtfs)[:, 1]
 
 # %% [markdown]
 # ### 5.4 최종 모델 성능 평가
