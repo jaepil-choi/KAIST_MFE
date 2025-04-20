@@ -13,6 +13,12 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from imblearn.over_sampling import SMOTE
 from collections import Counter
+import os
+
+# Create plots directory if it doesn't exist
+plots_dir = 'plots'
+if not os.path.exists(plots_dir):
+    os.makedirs(plots_dir)
 
 # Load the data
 bank_data = pd.read_csv('prob1_bank.csv')
@@ -37,7 +43,7 @@ print(bank_data['y'].value_counts(normalize=True) * 100)
 plt.figure(figsize=(8, 6))
 sns.countplot(x='y', data=bank_data)
 plt.title('Target Variable Distribution')
-plt.savefig('target_distribution.png')
+plt.savefig(os.path.join(plots_dir, 'target_distribution.png'))
 plt.close()
 
 # %% [markdown]
@@ -62,7 +68,7 @@ for col in categorical_cols:
     plt.title(f'Distribution of {col}')
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(f'distribution_{col}.png')
+    plt.savefig(os.path.join(plots_dir, f'distribution_{col}.png'))
     plt.close()
 
 # Preprocessing categorical variables using OneHotEncoder
@@ -98,14 +104,14 @@ for col in numerical_cols:
     plt.figure(figsize=(8, 6))
     sns.boxplot(y=bank_data[col])
     plt.title(f'Boxplot of {col}')
-    plt.savefig(f'boxplot_{col}.png')
+    plt.savefig(os.path.join(plots_dir, f'boxplot_{col}.png'))
     plt.close()
     
     # Distribution
     plt.figure(figsize=(8, 6))
     sns.histplot(bank_data[col], kde=True)
     plt.title(f'Distribution of {col}')
-    plt.savefig(f'hist_{col}.png')
+    plt.savefig(os.path.join(plots_dir, f'hist_{col}.png'))
     plt.close()
 
 # Apply standardization to numerical features
@@ -157,7 +163,7 @@ plt.xlabel('Class')
 plt.xticks([0, 1], ['No', 'Yes'])
 
 plt.tight_layout()
-plt.savefig('class_balance_comparison.png')
+plt.savefig(os.path.join(plots_dir, 'class_balance_comparison.png'))
 plt.close()
 
 print("Final preprocessed dataset shape:", X_resampled.shape)
@@ -201,14 +207,14 @@ for i, column in enumerate(card_data.columns):
     sns.histplot(card_data[column], kde=True)
     plt.title(f'Distribution of {column}')
 plt.tight_layout()
-plt.savefig('card_features_distribution.png')
+plt.savefig(os.path.join(plots_dir, 'card_features_distribution.png'))
 plt.close()
 
 # Correlation heatmap
 plt.figure(figsize=(10, 8))
 sns.heatmap(card_data.corr(), annot=True, cmap='coolwarm', fmt='.2f')
 plt.title('Correlation Heatmap')
-plt.savefig('correlation_heatmap.png')
+plt.savefig(os.path.join(plots_dir, 'correlation_heatmap.png'))
 plt.close()
 
 # Preprocess data: scaling features
@@ -251,7 +257,7 @@ plt.ylabel('Silhouette Score')
 plt.title('Silhouette Score for Optimal k')
 
 plt.tight_layout()
-plt.savefig('kmeans_optimal_k.png')
+plt.savefig(os.path.join(plots_dir, 'kmeans_optimal_k.png'))
 plt.close()
 
 # Select optimal k based on elbow method and silhouette score
@@ -268,7 +274,7 @@ card_data['KMeans_Cluster'] = kmeans_labels
 plt.figure(figsize=(8, 6))
 sns.countplot(x='KMeans_Cluster', data=card_data)
 plt.title('Distribution of K-Means Clusters')
-plt.savefig('kmeans_cluster_distribution.png')
+plt.savefig(os.path.join(plots_dir, 'kmeans_cluster_distribution.png'))
 plt.close()
 
 # Analyze clusters
@@ -284,7 +290,7 @@ plt.ylabel('Standardized Value')
 plt.xlabel('Features')
 plt.xticks(rotation=45)
 plt.legend(title='Cluster')
-plt.savefig('kmeans_cluster_profiles.png')
+plt.savefig(os.path.join(plots_dir, 'kmeans_cluster_profiles.png'))
 plt.close()
 
 # %% [markdown]
@@ -309,7 +315,7 @@ plt.axhline(y=0.5, color='r', linestyle='--')  # Example threshold
 plt.title('K-Distance Graph (k=5)')
 plt.xlabel('Data Points (sorted)')
 plt.ylabel('Distance to 5th Nearest Neighbor')
-plt.savefig('dbscan_epsilon_selection.png')
+plt.savefig(os.path.join(plots_dir, 'dbscan_epsilon_selection.png'))
 plt.close()
 
 # Apply DBSCAN with selected parameters
@@ -333,7 +339,7 @@ print(f'Number of noise points: {n_noise}')
 plt.figure(figsize=(8, 6))
 sns.countplot(x='DBSCAN_Cluster', data=card_data)
 plt.title('Distribution of DBSCAN Clusters')
-plt.savefig('dbscan_cluster_distribution.png')
+plt.savefig(os.path.join(plots_dir, 'dbscan_cluster_distribution.png'))
 plt.close()
 
 # Analyze clusters
@@ -368,7 +374,7 @@ sns.countplot(x='DBSCAN_Cluster', data=card_data)
 plt.title('DBSCAN Clusters')
 
 plt.tight_layout()
-plt.savefig('cluster_comparison.png')
+plt.savefig(os.path.join(plots_dir, 'cluster_comparison.png'))
 plt.close()
 
 # Decision on which model to choose
@@ -440,7 +446,7 @@ else:
 
 # Create radar chart
 radar_fig = radar_chart(radar_df, f'{selected_model} Cluster Profiles')
-radar_fig.savefig('cluster_radar_chart.png')
+radar_fig.savefig(os.path.join(plots_dir, 'cluster_radar_chart.png'))
 plt.close()
 
 # %% [markdown]
@@ -466,7 +472,7 @@ scatter = sns.scatterplot(
     alpha=0.8
 )
 plt.title(f't-SNE Visualization with {selected_model} Clusters', fontsize=14)
-plt.savefig('tsne_visualization.png')
+plt.savefig(os.path.join(plots_dir, 'tsne_visualization.png'))
 plt.close()
 
 # %% [markdown]
