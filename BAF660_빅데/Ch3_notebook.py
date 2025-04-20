@@ -1,10 +1,10 @@
 # %% [markdown]
 # Ch3
-# 
+#
 # April 9, 2025
-# 
+#
 # 1 Lending Club Data
-# 
+#
 # • Lending Club 데이터
 # – 2007~2017 3분기의 기간 동안의 대출 데이터 (Kaggle 제공, https://www.kaggle.com/wendykan/lending-club-loan-data)
 # – 원 자료는 88만개 이상의 사례의 150개 특성변수에 대한 정보를 담고 있음.
@@ -157,7 +157,7 @@ Y_train.value_counts()
 # – feature_importances_ : 각 특성변수 별 특성 중요도
 
 # %%
-!pip install xgboost
+# # !pip install xgboost
 
 # %%
 from xgboost import XGBClassifier
@@ -246,7 +246,7 @@ print(confusion_matrix(Y_test, Y_pred))
 print(accuracy_score(Y_test, Y_pred))
 
 # %%
-!pip install shap
+# !pip install shap
 
 # %%
 import shap
