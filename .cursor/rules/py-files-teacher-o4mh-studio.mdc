@@ -1,0 +1,87 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Guide the user in reviewing Python files present in a specified folder, educating them on each file's purpose and structure in a clear and chronological order.
+
+During the review, focus on inline comments and the logical structure of the code to produce a teacher-style explanation of each `.py` file found in the directory and its subdirectories.
+
+- **Input Format**
+  - **Folder Name**: A single argument supplied by the user (e.g., a name in quotes) which you will recursively search for Python files.
+
+- **Environment Details**
+  - **Shell**: Windows CMD
+  - **Path Format**: Paths must be enclosed in double quotes and use backslashes for Windows.
+
+- **File Discovery**
+  - Use the recursive listing command to identify files:
+    ```bat
+    dir "%folder%\*.py" "%folder%\*.ipynb" /S /A:-D /O:D /T:C
+    ```
+  - Filter and process these files to prepare for the review.
+
+# Steps
+
+1. **Execute** the directory listing command and parse its output to gather file information.
+   - Capture details such as file path, base name, extension, and creation timestamp.
+
+2. **Filter** and process files:
+   - Keep only `.py` files, associate with any matching `.ipynb` files based on the base name, and assign an earliest timestamp.
+
+3. **Sort** the `.py` files based on their creation timestamps in ascending order to establish a review order.
+
+4. For each `.py` file:
+   - **Read** the file completely.
+   - **Partition** the code into major sections by identifying function and class definitions, and Jupyter-style separators.
+   - **Infer** section headings that express the purpose of each code block.
+   - **Extract** and analyze inline and block comments for insights.
+
+5. **Summarize** each file:
+   - Provide a high-level overview of the code.
+   - Enumerate keywords or topics covered.
+   - List inferred section headings with line ranges.
+   - Offer detailed explanations for each section, focusing on key learning points and insights.
+
+# Output Format
+
+Provide the analysis in markdown, maintaining the following structure:
+
+```markdown
+# Review of Python Files
+
+## 1. [Full Path to File]
+**Timestamp:** [Creation Timestamp]
+
+### 1. What the code does
+[Brief overview of the file's purpose.]
+
+### 2. Keywords / Topics
+- [Keyword / Topic 1]
+- [Keyword / Topic 2]
+- ...
+
+### 3. Table of Contents
+- [Inferred Section Heading] (lines X–Y)
+- ...
+
+### 4. Detailed Section-by-Section Explanation
+
+#### [Inferred Section Heading] (lines X–Y)
+- **a) Key concepts:** [Concepts]
+- **b) Implementation details:** [Details]
+- **c) Insights from comments:** [Insights]
+
+<!-- Continue for each section -->
+
+## 2. [Full Path to File]
+**Timestamp:** [Creation Timestamp]
+
+<!-- Repeat structure for each file -->
+```
+
+# Notes
+
+- Ensure to handle cases where no `.ipynb` file is found.
+- When timestamps are identical, respect the order from the CMD output.
+- Further refinements can be addressed as needed.
