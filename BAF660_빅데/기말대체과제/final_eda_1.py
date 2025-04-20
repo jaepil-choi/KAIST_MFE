@@ -72,6 +72,8 @@ if missing_df['결측치 수'].sum() == 0:
 # %%
 # 범주형 변수와 수치형 변수 분리
 categorical_cols = bank_data.select_dtypes(include=['object']).columns.tolist()
+categorical_cols.remove('y')  # 'y'는 타겟 변수로 제외
+
 numerical_cols = bank_data.select_dtypes(include=['int64', 'float64']).columns.tolist()
 
 print("범주형 변수:", categorical_cols)
@@ -102,6 +104,59 @@ plot_filename = os.path.join(plot_dir_eda1, 'categorical_distributions_vs_target
 plt.savefig(plot_filename)
 plt.show()
 plt.close(fig)
+
+# %% [markdown]
+# ### 3.1.1 범주형 변수 변환
+#
+# 이전 논의에 따라 다음과 같은 변환 전략을 적용합니다:
+# - **job, marital, contact**: 순서 없는 범주형 변수 -> 원-핫 인코딩
+# - **education**: 순서 있는 범주형 변수 -> 순서형 인코딩 (primary=0, secondary=1, tertiary=2), 'unknown'은 NaN으로 처리
+# - **default, housing, loan, y**: 이진 변수 -> 0/1 인코딩
+# - **month**: 순환형 변수 -> Sin/Cos 변환
+
+# %%
+# 변환을 위한 데이터프레임 복사
+bank_transformed = bank_data.copy()
+
+# education 변환 (순서형 + unknown 처리)
+education_map = {'primary': 0, 'secondary': 1, 'tertiary': 2, 'unknown': np.nan}
+bank_transformed['education_encoded'] = bank_transformed['education'].map(education_map)
+print("\nEducation 변환 후 (unknown은 NaN):")
+print(bank_transformed[['education', 'education_encoded']].head(10))
+print(bank_transformed['education_encoded'].isnull().sum(), "개의 unknown 값 (NaN으로 변환)")
+
+# 이진 변수 변환 (default, housing, loan, y)
+binary_cols = ['default', 'housing', 'loan', 'y']
+for col in binary_cols:
+    map_dict = {'no': 0, 'yes': 1}
+    new_col_name = f'{col}_encoded'
+    bank_transformed[new_col_name] = bank_transformed[col].map(map_dict)
+    print(f"\n{col} 변환 후:")
+    print(bank_transformed[[col, new_col_name]].head())
+
+# month 변환 (Sin/Cos)
+month_map = {
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+}
+bank_transformed['month_num'] = bank_transformed['month'].map(month_map)
+bank_transformed['month_sin'] = np.sin(2 * np.pi * bank_transformed['month_num'] / 12)
+bank_transformed['month_cos'] = np.cos(2 * np.pi * bank_transformed['month_num'] / 12)
+print("\nMonth 변환 후 (Sin/Cos):")
+print(bank_transformed[['month', 'month_num', 'month_sin', 'month_cos']].head())
+
+# 원-핫 인코딩 변수 (job, marital, contact)
+# EDA 단계에서는 get_dummies를 사용하여 간단히 확인
+one_hot_cols = ['job', 'marital', 'contact']
+bank_transformed = pd.get_dummies(bank_transformed, columns=one_hot_cols, drop_first=True, prefix=one_hot_cols)
+print("\n원-핫 인코딩 적용 후 컬럼 일부:")
+print(bank_transformed.filter(regex='job_|marital_|contact_').head())
+
+# 최종 변환된 데이터 확인
+print("\n최종 변환된 데이터프레임 정보:")
+print(bank_transformed.info())
+print("\n최종 변환된 데이터프레임 상위 5개 행:")
+print(bank_transformed.head())
 
 # %% [markdown]
 # ### 3.2 수치형 변수 분석
