@@ -1,4 +1,4 @@
-#%%
+# %%
 import numpy as np
 from scipy.special import erfi
 from bertram0_functions import w1, w2
@@ -14,10 +14,14 @@ def variance(a, m, c, alpha, eta):
         ((np.pi**3) * (erfi(z_m/np.sqrt(2))-erfi(z_a/np.sqrt(2)))**3)
 
 
-#%%
+# %%
 #Analytical results
 alpha = 100    #mean reversion speed
 eta = 0.15     #volatility
+# Eta의 직관적인 의미: 
+#   - \eta * dW_t 라는 부분에서  = \eta * \sqrt{dt} * \epsilon_t
+#   - 하루로 보면 1% 정도의 변동성. 
+
 c = 0.001      #cost
 rf = 0.002
 mm = np.linspace(-0.03, 0.03, 101)
@@ -58,9 +62,12 @@ ax.set_zlabel('SR')
 plt.show()
 
 
+# %% [markdown]
+# 최적해. 기대수익 최대화 전략의 수식을 구현하신 것. 
+
 # %%
 
-from scipy.optimize import root_scalar, minimize
+from scipy.optimize import root_scalar, minimize, fsolve
 def fun(a, alpha, eta, c):
     return np.exp((alpha*a**2)/(eta**2)) * (2*a+c) - eta*np.sqrt(np.pi/alpha) * erfi(a*np.sqrt(alpha)/eta)
 
@@ -69,6 +76,7 @@ def max_er(a, alpha, eta, c):
 
 
 root = root_scalar(fun, args=(alpha, eta, c, ), x0=-0.01)
+# root = fsolve(fun, args=(alpha, eta, c, ), x0=-0.01) # legacy
 maxER = max_er(root.root, alpha, eta, c)
 
 

@@ -1,4 +1,4 @@
-#%%
+# %%
 import numpy as np 
 import matplotlib.pyplot as plt 
 import pandas as pd
@@ -24,7 +24,7 @@ t1 = time.time()
 print(f"time = {t1-t0:.5f} seconds")
 
 
-#%%
+# %%
 #Compare simulation and analytical results
 t0 = time.time()
 exp_times = pd.DataFrame(columns=["simulation", "analytical"])
@@ -36,7 +36,16 @@ for b in tqdm(np.linspace(0.05, 0.5, 10)):
 
 exp_times.plot(marker="o", linestyle="-", xlabel="target level", ylabel="E[T]", title="First passage time")
 
-#%%
+# %% [markdown]
+# 시뮬레이션으로 구한게 파란색 시간. 
+#
+# analytical 하게 구한거랑 근접하게 간다. 
+#
+# simulation이 조~금 더 높은데, simulation이 discrete하게 들어가니까 약간의 오차가 생기는 것. 
+#
+# 시간 간격 사이에 touch 했을 수 있는데 그것이 count 안되는 경우도 생겨서. 
+
+# %%
 b = 0.3
 #Analytical results
 exp_t1 = phi1(b) - phi1(a)
@@ -48,7 +57,7 @@ print(f"E[t1] = {exp_t1:.5f}, E[t2] = {exp_t2:.5f}, E[T] = {exp_t1 + exp_t2:.5f}
 print(f"V[t1] = {var_t1:.5f}, V[t2] = {var_t2:.5f}, V[T] = {var_t1 + var_t2:.5f}")
 
 
-#%%
+# %%
 #Trade length distribution
 print(f"(A) {a} -> (B) {b} -> (A) {a}")
 Et = expected_trade_length(a, b)
@@ -95,5 +104,8 @@ ax.set_zlabel('V[T]')
 ax.set_box_aspect([1, 1, 0.3])
 plt.show()
 
+
+# %% [markdown]
+# a 에서 진입, b에서 청산. 
 
 # %%
