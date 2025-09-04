@@ -1,4 +1,4 @@
-#%%
+# %%
 import pandas as pd 
 import numpy as np 
 import matplotlib.pyplot as plt
@@ -46,14 +46,14 @@ print("Coint Equation:", end=" ")
 print(f"log(PEPSI) = {test_results['alpha']:.4f} + {test_results['beta']:.4f} * log(COCA)")
 
 
-#%%
+# %%
 #coint 함수 사용
 print("=== coint 함수 사용 ===")
-coint_results = coint(y, x)
+coint_results = coint(y, x) # statsmodels 에 있는 공적분 검정 함수 (Engel Granger)
 print(f"p-value: {coint_results[1]:.4f}")
 
 
-#%%
+# %%
 # 시각화
 residuals = test_results['residuals']
 plt.figure(figsize=(15, 10))
@@ -77,7 +77,7 @@ plt.tight_layout()
 plt.show()
 
 
-#%%
+# %%
 #ACF, PACF 시각화
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
@@ -112,3 +112,10 @@ print(f"phi0_est: {phi0_est:.4f}, phi1_est: {phi1_est:.4f}, sigma_est: {sigma_es
 print(f"mean-reversion: {(1-phi1_est)/dt:.4f}")
 print(f"half-life: {np.log(2)/((1-phi1_est)/dt):.4f}")
 
+# 결과 해석
+# phi0_est: 0.0001, phi1_est: 0.9958, sigma_est: 0.0124
+# mean-reversion: 1.0656
+# half-life: 0.6505
+# mean reversion parameter가 1 정도 나온다. half-life로 환산해본 것. 
+
+# %%
