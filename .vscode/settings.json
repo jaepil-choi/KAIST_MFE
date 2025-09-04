@@ -4,10 +4,12 @@
       "commands": [
         {
           "match": "\\.(py|ipynb)$",
+          // "match": "\\.(ipynb)$",
           "notMatch": "\\.venv\\\\.*",
           "cmd": "poetry run jupytext --sync ${file}",
           "autoShowOutputPanel": "error"
         }
       ]
-    }
+    },
+    "python-envs.pythonProjects": []
   }
