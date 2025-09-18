@@ -6,7 +6,7 @@
           "match": "\\.(py|ipynb)$",
           // "match": "\\.(ipynb)$",
           "notMatch": "\\.venv\\\\.*",
-          "cmd": "poetry run jupytext --sync ${file}",
+          "cmd": "poetry run jupytext --sync \"${file}\"",
           "autoShowOutputPanel": "error"
         }
       ]
