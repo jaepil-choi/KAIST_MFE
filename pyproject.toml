@@ -45,6 +45,9 @@ imbalanced-learn = "^0.13.0"
 shap = "^0.47.2"
 pandasql = "^0.7.3"
 pyreadr = "^0.5.3"
+bottleneck = "^1.6.0"
+eikon = "^1.1.18"
+python-dotenv = "^1.1.1"
 
 
 [build-system]
