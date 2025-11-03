@@ -7,7 +7,7 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.17.0
 #   kernelspec:
-#     display_name: .venv
+#     display_name: kaist-mfe-quantpy-py3.12
 #     language: python
 #     name: python3
 # ---
@@ -1078,14 +1078,3 @@ FF_HML_devil = FF_HML_devil.loc[START_DATE:]
 # %%
 (FF_HML_devil + 1).cumprod().plot(legend=True, label='HML_devil')
 (FF_HML + 1).cumprod().plot(legend=True, label='HML')
-
-# %% [markdown]
-# ## 미국은 어떨까? 
-#
-# 블룸버그 가서 팩터 etf 수익률 찍어봄. 그냥 가격이고 누적 수익률은 아님을 유의
-
-# %% [markdown]
-# ![image.png](attachment:image.png)
-
-# %% [markdown]
-#
